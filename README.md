@@ -93,6 +93,8 @@ The [C4 model](https://c4model.com/) is a simple and intuitive way to create sof
 
 The source for diagrams should be in Git for change control and review purposes. Recommendations are [draw.io](https://app.diagrams.net/) (example above in [docs](.docs/diagrams/) folder) and [Mermaids](https://github.com/mermaid-js/mermaid). Here is an example Mermaids sequence diagram:
 
+
+
 ```mermaid
 sequenceDiagram
     User->>+Service: GET /users?params=...
