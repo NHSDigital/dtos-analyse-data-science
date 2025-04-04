@@ -31,6 +31,31 @@ The ONS Client package provides an interface to the Office for National Statisti
 
 4. **Output:** The final CSV file(s) are saved in a structured directory (under a `data` folder) and can be used for further analysis or integration into other systems.
 
+## Installation
+
+Clone the repository and install the required dependencies:
+
+### Using Poetry
+
+Install Poetry if you don't already have it:
+
+```bash
+pip install poetry
+```
+
+Install the dependencies using Poetry:
+
+```bash
+poetry install
+```
+
+## Running the Code
+
+To run the code using Poetry, use the following command:
+
+```bash
+poetry run python ons_client/download_filtered_csv.py
+=======
 ## Usage
 
 ### Downloading CSV for a Specific Area
@@ -79,4 +104,4 @@ For further details, refer to the [ONS Developer Hub](https://developer.ons.gov.
 
 ## License
 
-[Specify Your License Here]
+MIT
