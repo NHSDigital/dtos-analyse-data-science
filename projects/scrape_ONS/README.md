@@ -31,35 +31,29 @@ The ONS Client package provides an interface to the Office for National Statisti
 
 4. **Output:** The final CSV file(s) are saved in a structured directory (under a `data` folder) and can be used for further analysis or integration into other systems.
 
-## Usage
-
-### Downloading CSV for a Specific Area
-
-Run the following command to download CSV data for a specific area:
-
-```python
-python download_filtered_csv.py
-```
-
-This script will use the provided dataset ID, population type, and area type (with an optional area code) to download the CSV file.
-
-### Downloading CSV for All Area Types
-
-Use the `download_all_area_types` function in `download_filtered_csv.py` to iterate through all available area types and download corresponding CSV outputs, merging batch results into a single file per area type.
-
-## Requirements
-
-- Python 3.7+
-- requests
-- pydantic
-
 ## Installation
 
 Clone the repository and install the required dependencies:
 
-```python
-pip install -r requirements.txt
+
+
+### Using Poetry
+1. Install Poetry if you don't already have it:
+   ```bash
+   pip install poetry
+   ```
+2. Install the dependencies using Poetry:
+   ```bash
+   poetry install
+   ```
+
+## Running the Code
+
+To run the code using Poetry, use the following command:
+```bash
+poetry run python ons_client/download_filtered_csv.py
 ```
+
 
 ## Integration with ONS Developer Hub
 
@@ -79,4 +73,4 @@ For further details, refer to the [ONS Developer Hub](https://developer.ons.gov.
 
 ## License
 
-[Specify Your License Here]
+MIT

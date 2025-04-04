@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "scrape-ons"
+version = "0.1.0"
+description = "This project scrapes intomation from the ONS API"
+authors = ["pearceja <pearce.jarrett1@nhs.net>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+requests = "^2.32.3"
+pydantic = "^2.11.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
