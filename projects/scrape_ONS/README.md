@@ -35,25 +35,27 @@ The ONS Client package provides an interface to the Office for National Statisti
 
 Clone the repository and install the required dependencies:
 
-
-
 ### Using Poetry
-1. Install Poetry if you don't already have it:
-   ```bash
-   pip install poetry
-   ```
-2. Install the dependencies using Poetry:
-   ```bash
-   poetry install
-   ```
+
+Install Poetry if you don't already have it:
+
+```bash
+pip install poetry
+```
+
+Install the dependencies using Poetry:
+
+```bash
+poetry install
+```
 
 ## Running the Code
 
 To run the code using Poetry, use the following command:
+
 ```bash
 poetry run python ons_client/download_filtered_csv.py
 ```
-
 
 ## Integration with ONS Developer Hub
 
