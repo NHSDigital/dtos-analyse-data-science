@@ -10,4 +10,9 @@
 *.code-workspace
 !project.code-workspace
 
+*__pycache__*
+*.csv
+*.json
+
+# test
 # Please, add your custom content below!
