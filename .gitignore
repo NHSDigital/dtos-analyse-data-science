@@ -16,3 +16,6 @@
 
 # test
 # Please, add your custom content below!
+
+# Environment variable file
+.env
