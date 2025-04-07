@@ -31,11 +31,11 @@ The ONS Client package provides an interface to the Office for National Statisti
 
 4. **Output:** The final CSV file(s) are saved in a structured directory (under a `data` folder) and can be used for further analysis or integration into other systems.
 
-## Installation
+## Installation and running the code
 
 Clone the repository and install the required dependencies:
 
-### Using Poetry
+### Locally
 
 Install Poetry if you don't already have it:
 
@@ -48,16 +48,26 @@ Install the dependencies using Poetry:
 ```bash
 poetry install
 ```
-
-## Running the Code
-
-To run the code using Poetry, use the following command:
+Navigate to the scrape_ONS folder, then to run the code using Poetry, use the following command:
 
 ```bash
 poetry run python ons_client/download_filtered_csv.py
 ```
 
-=======
+### Using Podman
+
+Navigate to the scrape_ONS folder then,
+
+```bash
+podman build -t scrape_ons_image .
+```
+Once the image has built
+```bash
+podman run --rm \
+  -v "$(pwd):/app" \
+  -w /app \
+  scrape_ons_image
+```
 
 ## Requirements
 
