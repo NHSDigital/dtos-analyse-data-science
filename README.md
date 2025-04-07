@@ -3,7 +3,7 @@
 [![CI/CD Pull Request](https://github.com/nhs-england-tools/repository-template/actions/workflows/cicd-1-pull-request.yaml/badge.svg)](https://github.com/nhs-england-tools/repository-template/actions/workflows/cicd-1-pull-request.yaml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=repository-template&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=repository-template)
 
-Welcome to the DSPS Analyse team's Data Science repository! This repo stores all of our Data Science projects.
+Welcome to the DSPS Analyse team's Data Science repository! This repository stores all of our Data Science projects.
 
 ## Table of Contents
 
@@ -34,7 +34,7 @@ The following software packages, or their equivalents, are expected to be instal
 
 - [Docker](https://www.docker.com/) container runtime or a compatible tool, e.g. [Podman](https://podman.io/),
 - [GNU make](https://www.gnu.org/software/make/) 3.82 or later,
-- pip package manager for python
+- pip package manager for Python
 
 > [!NOTE]<br>
 > The version of GNU make available by default on macOS is earlier than 3.82. You will need to upgrade it or certain `make` tasks will fail. On macOS, you will need [Homebrew](https://brew.sh/) installed, then to install `make`, like so:
@@ -76,7 +76,7 @@ To run tests on your local branch (these are the same tests that run automatical
 
 ## Design
 
-Each project in the projects folder is self-contained, with it's own README, pyproject.toml and Dockerfile. Projects can be developed on local machines, using Poetry for virtual environments, package and dependency management. Alternatively Podman/Docker can be used to run the scripts.
+Each project in the projects folder is self-contained, with it's own README, pyproject.toml and Docker file. Projects can be developed on local machines, using Poetry for virtual environments, package and dependency management. Alternatively Podman/Docker can be used to run the scripts.
 
 ## Contacts
 
