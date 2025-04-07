@@ -5,6 +5,7 @@ description = "This project scrapes intomation from the ONS API"
 authors = ["pearceja <pearce.jarrett1@nhs.net>"]
 license = "MIT"
 readme = "README.md"
+packages = [{ include = "ons_client" }]
 
 [tool.poetry.dependencies]
 python = "^3.12"
