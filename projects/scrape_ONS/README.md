@@ -48,6 +48,7 @@ Install the dependencies using Poetry:
 ```bash
 poetry install
 ```
+
 Navigate to the scrape_ONS folder, then to run the code using Poetry, use the following command:
 
 ```bash
@@ -61,7 +62,9 @@ Navigate to the scrape_ONS folder then,
 ```bash
 podman build -t scrape_ons_image .
 ```
+
 Once the image has built
+
 ```bash
 podman run --rm \
   -v "$(pwd):/app" \
