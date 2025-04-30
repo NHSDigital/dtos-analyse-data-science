@@ -7,6 +7,7 @@ class DatasetType(str, Enum):
     """Enum representing the types of datasets supported by the ONS API"""
     TIME_SERIES = "TS"
     REGULAR_MATRIX = "RM"
+    OTHER = "OTHER"
 
 
 class GeoLevel(BaseModel):
@@ -47,7 +48,7 @@ class Dataset(BaseModel):
         elif self.id.startswith("RM"):
             return DatasetType.REGULAR_MATRIX
         else:
-            raise ValueError(f"Unknown dataset type for ID: {self.id}")
+            return DatasetType.OTHER
 
 
 class BatchSizeConfig(BaseModel):
@@ -73,3 +74,12 @@ class ONSConfig(BaseModel):
     population_type: str = "UR"
     output_dir: str = "data"
     batch_sizes: BatchSizeConfig = Field(default_factory=BatchSizeConfig)
+
+
+class DatasetAvailability(BaseModel):
+    """Dataset availability model for checking if a dataset exists at a specific geographic level."""
+    dataset_id: str
+    geo_level: str
+    population_type: str
+    is_available: bool
+    error_message: Optional[str] = None

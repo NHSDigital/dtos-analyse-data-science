@@ -7,7 +7,7 @@ from functools import wraps
 import json
 import os
 
-from ..models.common import Dataset, Dimension, DimensionOption, DimensionWithOptions
+from ..models.common import Dataset, Dimension, DimensionOption, DimensionWithOptions, DatasetAvailability
 
 logger = logging.getLogger(__name__)
 
@@ -91,33 +91,225 @@ class ONSApiClient:
             base_url: Override the default base URL for the API
         """
         self.base_url = base_url or self.BASE_URL
+        self.session = requests.Session()
 
     @with_retry(max_retries=3)
     def get_datasets(self) -> List[Dataset]:
         """
-        Get all available datasets from the ONS API.
+        Get all available datasets from the ONS API, including Census datasets.
+        Uses pagination and proper discovery instead of hard-coded lists.
 
         Returns:
             List of Dataset objects
         """
-        url = f"{self.base_url}/datasets"
-        logger.info(f"Fetching datasets from {url}")
-
-        response = requests.get(url)
-        response.raise_for_status()
-
-        data = response.json()
+        logger.info("Fetching datasets from the ONS API")
         datasets = []
 
-        for item in data.get("items", []):
-            dataset = Dataset(
-                id=item.get("id", ""),
-                title=item.get("title", ""),
-                description=item.get("description", "")
-            )
-            datasets.append(dataset)
+        # Step 1: Fetch standard datasets from the API endpoint with pagination
+        base_url = f"{self.base_url}/datasets"
+        page_count = 0
+        total_api_datasets = 0
 
-        logger.info(f"Retrieved {len(datasets)} datasets")
+        # Set pagination parameters
+        limit = 100  # Get more items per page to reduce number of requests
+        offset = 0
+        total_count = None  # Will be set from first response
+
+        # Continue fetching until we've got all datasets
+        while True:
+            page_count += 1
+            # Construct URL with pagination parameters
+            next_url = f"{base_url}?limit={limit}&offset={offset}"
+            # logger.info(f"Fetching datasets page {page_count} from {next_url}")
+
+            try:
+                response = requests.get(next_url)
+                response.raise_for_status()
+                data = response.json()
+
+                # Get total count from first response
+                if total_count is None and "total_count" in data:
+                    total_count = data["total_count"]
+                    # logger.info(f"API reports {total_count} total datasets available")
+
+                # Process current page items
+                items_count = 0
+                for item in data.get("items", []):
+                    dataset = Dataset(
+                        id=item.get("id", ""),
+                        title=item.get("title", ""),
+                        description=item.get("description", "")
+                    )
+                    datasets.append(dataset)
+                    total_api_datasets += 1
+                    items_count += 1
+
+                # logger.info(f"Retrieved {items_count} datasets from page {page_count}")
+
+                # Update offset for next page
+                offset += items_count
+
+                # Check if we've retrieved all datasets
+                if total_count is not None and total_api_datasets >= total_count:
+                    logger.info(f"Retrieved all {total_api_datasets} datasets")
+                    break
+
+                # If we got fewer items than the limit, we've reached the end
+                if items_count < limit:
+                    logger.info(f"No more datasets to fetch (received {items_count} < limit {limit})")
+                    break
+
+                # Add a small delay to avoid hitting rate limits
+                time.sleep(0.5)
+
+            except Exception as e:
+                logger.error(f"Error fetching datasets page {page_count}: {str(e)}")
+                break
+
+        logger.info(f"Retrieved {total_api_datasets} standard datasets from {page_count} pages")
+
+        # Step 2: Discover Census datasets through population-types API
+        try:
+            logger.info("Discovering Census datasets through population-types API")
+
+            # Get population types (e.g., "UR" for usual residents)
+            pop_url = f"{self.base_url}/population-types"
+            logger.info(f"Fetching population types from {pop_url}")
+            pop_response = requests.get(pop_url)
+            pop_response.raise_for_status()
+            pop_data = pop_response.json()
+
+            # Process each population type
+            pop_types = []
+            for item in pop_data.get("items", []):
+                pop_id = item.get("id")
+                if pop_id:
+                    pop_types.append(pop_id)
+
+            logger.info(f"Found {len(pop_types)} population types: {', '.join(pop_types)}")
+
+            # For each population type, find dimensions which can indicate Census datasets
+            census_datasets = []
+            for pop_type in pop_types:
+                logger.info(f"Checking dimensions for population type: {pop_type}")
+
+                # Get dimensions for this population type
+                dim_url = f"{self.base_url}/population-types/{pop_type}/dimensions"
+                dim_response = requests.get(dim_url)
+
+                if dim_response.status_code == 200:
+                    dim_data = dim_response.json()
+                    for dim in dim_data.get("items", []):
+                        # Find any dimension link that includes a dataset ID
+                        for link_type, link_data in dim.get("links", {}).items():
+                            href = link_data.get("href", "")
+
+                            # Extract dataset ID if it matches Census format (TS or RM)
+                            # Example: "/datasets/TS008/editions/2021/versions/1/..."
+                            if "/datasets/" in href:
+                                parts = href.split("/")
+                                idx = parts.index("datasets") if "datasets" in parts else -1
+
+                                if idx >= 0 and idx + 1 < len(parts):
+                                    dataset_id = parts[idx + 1]
+                                    if (dataset_id.startswith("TS") or dataset_id.startswith("RM")) and dataset_id not in census_datasets:
+                                        census_datasets.append(dataset_id)
+
+                # Small delay to avoid hitting rate limits
+                time.sleep(0.5)
+
+            # For discovered Census dataset IDs, get metadata
+            logger.info(f"Found {len(census_datasets)} Census dataset IDs")
+
+            for dataset_id in census_datasets:
+                # Check if this dataset ID is already in our list
+                if not any(ds.id == dataset_id for ds in datasets):
+                    # Try to get metadata for this dataset
+                    try:
+                        meta_url = f"{self.base_url}/datasets/{dataset_id}/editions/2021/versions/1"
+                        meta_response = requests.get(meta_url)
+
+                        if meta_response.status_code == 200:
+                            meta_data = meta_response.json()
+
+                            # Create dataset object with metadata
+                            dataset = Dataset(
+                                id=dataset_id,
+                                title=meta_data.get("title", f"Census 2021 - {dataset_id}"),
+                                description=meta_data.get("description", "")
+                            )
+                            datasets.append(dataset)
+                            logger.debug(f"Added Census dataset: {dataset_id}")
+                        else:
+                            # If metadata fails, add with basic info
+                            dataset = Dataset(
+                                id=dataset_id,
+                                title=f"Census 2021 - {dataset_id}",
+                                description="Census 2021 dataset"
+                            )
+                            datasets.append(dataset)
+                            logger.debug(f"Added Census dataset with basic info: {dataset_id}")
+
+                    except Exception as e:
+                        logger.error(f"Error fetching metadata for {dataset_id}: {str(e)}")
+                        # Still add with basic info
+                        dataset = Dataset(
+                            id=dataset_id,
+                            title=f"Census 2021 - {dataset_id}",
+                            description="Census 2021 dataset"
+                        )
+                        datasets.append(dataset)
+
+                # Small delay to avoid hitting rate limits
+                time.sleep(0.2)
+
+            logger.info(f"Added {len(census_datasets)} Census datasets")
+
+            # Step 3: Also check for Census datasets using census-observations endpoint
+            # This is another route to discover Census datasets
+            try:
+                logger.info("Checking census-observations for additional datasets")
+
+                # Check UR population type for census observations
+                obs_url = f"{self.base_url}/population-types/UR/census-observations?limit=10"
+                obs_response = requests.get(obs_url)
+
+                if obs_response.status_code == 200:
+                    obs_data = obs_response.json()
+
+                    # Look for dataset references in the response
+                    for dataset_link in obs_data.get("dataset_links", []):
+                        href = dataset_link.get("href", "")
+
+                        # Extract dataset ID from link
+                        if "/datasets/" in href:
+                            parts = href.split("/")
+                            idx = parts.index("datasets") if "datasets" in parts else -1
+
+                            if idx >= 0 and idx + 1 < len(parts):
+                                dataset_id = parts[idx + 1]
+
+                                # Only add if not already in our list
+                                if (dataset_id.startswith("TS") or dataset_id.startswith("RM")) and not any(ds.id == dataset_id for ds in datasets):
+                                    dataset = Dataset(
+                                        id=dataset_id,
+                                        title=f"Census 2021 - {dataset_id}",
+                                        description="Census 2021 dataset discovered via census-observations"
+                                    )
+                                    datasets.append(dataset)
+                                    logger.debug(f"Added Census dataset from observations: {dataset_id}")
+
+            except Exception as e:
+                logger.error(f"Error checking census-observations: {str(e)}")
+
+        except Exception as e:
+            logger.error(f"Error discovering Census datasets: {str(e)}")
+            logger.debug(f"Full error: {str(e)}")
+
+        # Sort datasets by ID for consistent output
+        datasets.sort(key=lambda x: x.id)
+
+        logger.info(f"Total datasets: {len(datasets)}")
         return datasets
 
     @with_retry(max_retries=3)
@@ -132,7 +324,7 @@ class ONSApiClient:
             List of Dimension objects with their options
         """
         url = f"{self.base_url}/population-types/{population_type}/dimensions"
-        logger.info(f"Fetching dimensions for population type {population_type}")
+        # logger.info(f"Fetching dimensions for population type {population_type}")
 
         response = requests.get(url)
         response.raise_for_status()
@@ -152,7 +344,7 @@ class ONSApiClient:
             )
             dimensions.append(dimension)
 
-        logger.info(f"Retrieved {len(dimensions)} dimensions")
+        # logger.info(f"Retrieved {len(dimensions)} dimensions")
         return dimensions
 
     @with_retry(max_retries=3)
@@ -168,7 +360,7 @@ class ONSApiClient:
             List of DimensionOption objects
         """
         url = f"{self.base_url}/population-types/{population_type}/dimensions/{dimension_id}/options"
-        logger.debug(f"Fetching options for dimension {dimension_id}")
+        # logger.debug(f"Fetching options for dimension {dimension_id}")
 
         response = requests.get(url)
         response.raise_for_status()
@@ -183,7 +375,7 @@ class ONSApiClient:
             )
             options.append(option)
 
-        logger.debug(f"Retrieved {len(options)} options for dimension {dimension_id}")
+        # logger.debug(f"Retrieved {len(options)} options for dimension {dimension_id}")
         return options
 
     @with_retry(max_retries=3)
@@ -263,3 +455,133 @@ class ONSApiClient:
             logger.warning(f"Error saving to cache: {e}")
 
         return areas
+
+    def _make_request(self, endpoint: str, params: Dict = None, max_retries: int = 3) -> Dict:
+        """Make a request to the ONS API with retry logic.
+
+        Args:
+            endpoint: API endpoint to call.
+            params: Query parameters.
+            max_retries: Maximum number of retries.
+
+        Returns:
+            Response JSON as dictionary.
+        """
+        url = f"{self.base_url}{endpoint}"
+        retry_count = 0
+
+        while retry_count < max_retries:
+            try:
+                response = self.session.get(url, params=params)
+
+                if response.status_code == 429:  # Too Many Requests
+                    # Implement exponential backoff
+                    wait_time = 2 ** retry_count
+                    logger.warning(f"Rate limit hit. Waiting {wait_time} seconds...")
+                    time.sleep(wait_time)
+                    retry_count += 1
+                    continue
+
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Request error: {e}")
+                retry_count += 1
+                if retry_count < max_retries:
+                    time.sleep(1)  # Simple delay between retries
+                else:
+                    raise
+
+        raise Exception(f"Failed to get data after {max_retries} retries")
+
+    def get_area_types(self, population_type: str = "UR") -> List[Dict]:
+        """Get available area types for a population type.
+
+        Args:
+            population_type: Population type.
+
+        Returns:
+            List of area types.
+        """
+        endpoint = f"/population-types/{population_type}/area-types"
+        response = self._make_request(endpoint)
+        return response.get("items", [])
+
+    def get_areas(self, population_type: str, area_type: str) -> List[Dict]:
+        """Get areas for a specific area type.
+
+        Args:
+            population_type: Population type.
+            area_type: Area type.
+
+        Returns:
+            List of areas.
+        """
+        endpoint = f"/population-types/{population_type}/area-types/{area_type}/areas"
+        response = self._make_request(endpoint)
+        return response.get("items", [])
+
+    def check_dataset_availability(self, dataset_id: str, geo_level: str,
+                                   population_type: str = "UR") -> DatasetAvailability:
+        """Check if a dataset is available at a specific geographic level.
+
+        Args:
+            dataset_id: Dataset ID to check.
+            geo_level: Geographic level to check.
+            population_type: Population type.
+
+        Returns:
+            DatasetAvailability object with availability information.
+        """
+        result = DatasetAvailability(
+            dataset_id=dataset_id,
+            geo_level=geo_level,
+            population_type=population_type,
+            is_available=False
+        )
+
+        try:
+            # Get a single area of the specified geographic level
+            areas = self.get_areas(population_type, geo_level)
+            if not areas:
+                result.error_message = f"No areas found for geographic level: {geo_level}"
+                logger.warning(result.error_message)
+                return result
+
+            # Use the first area to test availability
+            test_area = areas[0]
+            area_code = test_area.get("id")
+            area_label = test_area.get("label", "Unknown")
+            logger.info(f"Testing dataset {dataset_id} availability at {geo_level} level using area: {area_label} ({area_code})")
+
+            # Make a test request to check if data is available
+            endpoint = f"/datasets/{dataset_id}/editions/2021/versions/1/json"
+            params = {
+                "area-type": f"{geo_level},{area_code}"
+            }
+
+            try:
+                response = self._make_request(endpoint, params)
+
+                # Check if the response contains observations with data
+                if response and "observations" in response and response["observations"]:
+                    result.is_available = True
+                    logger.info(f"Dataset {dataset_id} is available at {geo_level} level")
+                else:
+                    result.error_message = f"Dataset {dataset_id} doesn't contain observations at {geo_level} level"
+                    logger.warning(result.error_message)
+            except requests.exceptions.HTTPError as e:
+                status_code = e.response.status_code if hasattr(e, 'response') else None
+                if status_code == 404:
+                    result.error_message = f"Dataset {dataset_id} not found at {geo_level} level (404)"
+                else:
+                    result.error_message = f"HTTP error {status_code} checking dataset {dataset_id} at {geo_level} level"
+                logger.warning(result.error_message)
+            except Exception as e:
+                result.error_message = f"Error requesting dataset: {str(e)}"
+                logger.warning(result.error_message)
+        except Exception as e:
+            result.error_message = f"Error checking dataset availability: {str(e)}"
+            logger.warning(result.error_message)
+
+        return result
