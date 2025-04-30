@@ -3,14 +3,19 @@ import requests
 import json
 from typing import Optional, List, Dict
 
+import logging
 import csv
 import io
 import os
 
-from ons_client import ONSApiClient
-from models import FilterRequest, DatasetIdentifier, DimensionFilter, Area
-from filter_processor import FilterProcessor
-from utils import chunk_list, ensure_dir
+from .ons_client import ONSApiClient
+from .models import FilterRequest, DatasetIdentifier, DimensionFilter, Area
+from .filter_processor import FilterProcessor
+from .utils import chunk_list, ensure_dir
+
+# Set up basic logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.beta.ons.gov.uk/v1"
 
@@ -23,7 +28,8 @@ def download_filtered_csv(
         edition: str = "2021",
         version: int = 1,
         output_file: Optional[str] = None,
-        batch_size: int = 500
+        batch_size: int = 500,
+        include_all_dimensions: bool = True
     ) -> List[str]:
     """
     Creates a filter for a given dataset with the specified population type and area type.
@@ -41,6 +47,7 @@ def download_filtered_csv(
         output_file (Optional[str]): The file path to save the CSV file for a single area.
         If None, a default path will be used based on the dataset and area type.
         batch_size (int, optional): Number of area codes to process in each batch. Defaults to 500.
+        include_all_dimensions (bool, optional): Whether to include all dimensions in the filter. If False, only the geography dimension is used. Defaults to True.
 
     Returns:
         List[str]: List of paths to the downloaded CSV files.
@@ -49,6 +56,36 @@ def download_filtered_csv(
     dataset_dir = os.path.join("data", dataset_id)
     ensure_dir("data")
     ensure_dir(dataset_dir)
+
+    # Initialize the ONS client
+    client = ONSApiClient()
+
+    # Get all dimensions for the dataset
+    logger.info(f"Fetching dimensions for dataset {dataset_id}, edition {edition}, version {version}")
+    try:
+        dimensions_response = client.get_dataset_dimensions(dataset_id, edition, str(version))
+        dimensions = dimensions_response.items
+        logger.info(f"Found {len(dimensions)} dimensions for dataset {dataset_id}")
+
+        # Print out each dimension for reference
+        logger.info("Available dimensions:")
+        for dim in dimensions:
+            logger.info(f"  - {dim.id}: {dim.label}")
+
+    except Exception as e:
+        logger.warning(f"Error fetching dimensions: {str(e)}")
+        dimensions = []
+
+    # Determine which dimensions to use
+    filtered_dimensions = []
+    if include_all_dimensions and dimensions:
+        # Filter out "ltla" dimension
+        filtered_dimensions = [dim for dim in dimensions if dim.id.lower() != "ltla"]
+        logger.info(f"Using {len(filtered_dimensions)} dimensions after filtering out 'ltla':")
+        for dim in filtered_dimensions:
+            logger.info(f"  - Using dimension: {dim.id} ({dim.label})")
+    else:
+        logger.info(f"Using only geography dimension (include_all_dimensions={include_all_dimensions})")
 
     # Set up the filter processor
     filter_processor = FilterProcessor()
@@ -62,7 +99,6 @@ def download_filtered_csv(
 
     # If no area_code is provided, get all areas and process in batches
     if area_code is None:
-        client = ONSApiClient()
         areas = client.get_cached_areas(population_type, area_type)
         if not areas:
             raise Exception(f"No areas found for population type '{population_type}' and area type '{area_type}'.")
@@ -80,7 +116,8 @@ def download_filtered_csv(
                 area_type=area_type,
                 area_codes=all_area_codes,
                 edition=edition,
-                version=version
+                version=version,
+                additional_dimensions=filtered_dimensions
             )
             downloaded_file = filter_processor.process_filter(
                 filter_request, dataset_id, area_type, "all", output_file
@@ -111,7 +148,8 @@ def download_filtered_csv(
                     area_type=area_type,
                     area_codes=chunk,
                     edition=edition,
-                    version=version
+                    version=version,
+                    additional_dimensions=filtered_dimensions
                 )
 
                 # Process the batch and get the temporary file
@@ -177,7 +215,8 @@ def download_filtered_csv(
             area_type=area_type,
             area_codes=[area_code],
             edition=edition,
-            version=version
+            version=version,
+            additional_dimensions=filtered_dimensions
         )
         downloaded_file = filter_processor.process_filter(
             filter_request, dataset_id, area_type, area_code, output_file
@@ -185,7 +224,7 @@ def download_filtered_csv(
         return [downloaded_file]
 
 
-def download_all_area_types(dataset_id: str, population_type: str, edition: str = "2021", version: int = 1) -> Dict[str, List[str]]:
+def download_all_area_types(dataset_id: str, population_type: str, edition: str = "2021", version: int = 1, include_all_dimensions: bool = True) -> Dict[str, List[str]]:
     """
     For the specified dataset and population type, this function retrieves all available area types
     and downloads the CSV outputs for each area within each area type using the download_filtered_csv function.
@@ -195,6 +234,7 @@ def download_all_area_types(dataset_id: str, population_type: str, edition: str 
         population_type (str): The population type (e.g., "UR").
         edition (str, optional): The dataset edition. Defaults to "2021".
         version (int, optional): The dataset version. Defaults to 1.
+        include_all_dimensions (bool, optional): Whether to include all dimensions in the filter. Defaults to True.
 
     Returns:
         dict: A dictionary mapping each area type id to a list of downloaded CSV file paths.
@@ -216,7 +256,10 @@ def download_all_area_types(dataset_id: str, population_type: str, edition: str 
     results = {}
     for area_type in area_types:
         try:
-            # For each area type, retrieve the list of areas
+            # Initialize client if it doesn't exist
+            client = ONSApiClient()
+
+            # Get the areas for this area type
             areas = client.get_cached_areas(population_type, area_type.id)
             if areas:
                 # Generate output file path in the dataset directory
@@ -224,7 +267,7 @@ def download_all_area_types(dataset_id: str, population_type: str, edition: str 
 
                 print(f"Downloading CSV for area type '{area_type.name}' into file '{output_file}'")
                 csv_files = download_filtered_csv(
-                    dataset_id, population_type, area_type.id, None, edition, version, output_file, batch_size=2000
+                    dataset_id, population_type, area_type.id, None, edition, version, output_file, batch_size=2000, include_all_dimensions=include_all_dimensions
                 )
                 results[area_type.id] = csv_files
             else:
@@ -239,6 +282,14 @@ if __name__ == '__main__':
     # Example usage:
     # For dataset TS008 and population type "UR", first check all available area types
     # and then download the CSV outputs for each area within each area type.
-    all_csv_files = download_all_area_types("TS003", "UR")  # Using a valid dataset ID
-    print("Downloaded CSV files for all area types:")
-    print(all_csv_files)
+
+    # Get all dimensions except "ltla" (default behavior now)
+    logger.info("Downloading with all dimensions (except ltla):")
+    dataset_id = "TS003"  # Example dataset ID
+    all_csv_files = download_all_area_types(dataset_id, "UR")
+    logger.info(f"Downloaded CSV files for dataset {dataset_id}: {all_csv_files}")
+
+    # If you need to only use geography dimension (faster)
+    # logger.info("Downloading with only geography dimension (faster):")
+    # all_csv_files = download_all_area_types("TS003", "UR", include_all_dimensions=False)
+    # logger.info(f"Downloaded CSV files: {all_csv_files}")

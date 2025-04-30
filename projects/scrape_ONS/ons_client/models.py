@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field, root_validator
+from typing import Optional, List, Dict, Any, Union
 
 # Models for API requests
 class DatasetIdentifier(BaseModel):
@@ -50,8 +50,24 @@ class Area(BaseModel):
     area_type: str
 
 class Dimension(BaseModel):
-    id: str
-    label: str
+    id: Optional[str] = None
+    label: Optional[str] = Field(None, alias="label")
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+    class Config:
+        extra = "allow"  # Allow additional fields in the response
+
+class DimensionItem(BaseModel):
+    id: Optional[str] = None
+    name: Optional[str] = None
+    label: Optional[str] = None
+    description: Optional[str] = None
+    options: Optional[List[Dict[str, Any]]] = None
+    href: Optional[str] = None
+
+    class Config:
+        extra = "allow"  # Allow additional fields
 
 class Categorisation(BaseModel):
     id: str
@@ -77,17 +93,98 @@ class FilterSubmitResponse(BaseModel):
 class FilterOutputResponse(BaseModel):
     downloads: Optional[Downloads] = None
 
-class DatasetIdentifier(BaseModel):
-    id: str
-    edition: str = "2021"
-    version: int = 1
+## New models for dataset dimensions and metadata endpoints
 
-class DimensionFilter(BaseModel):
-    name: str
-    is_area_type: bool = True
-    options: List[str]
+class DimensionsResponse(BaseModel):
+    items: List[DimensionItem] = Field(..., alias="items")
 
-class FilterRequest(BaseModel):
-    dataset: DatasetIdentifier
-    population_type: str
-    dimensions: List[DimensionFilter]
+class DimensionOption(BaseModel):
+    id: str = Field(..., alias="option")
+    label: str
+
+class DimensionOptionsResponse(BaseModel):
+    items: List[DimensionOption] = Field(..., alias="items")
+
+class DimensionValues(BaseModel):
+    id: Optional[str] = None
+    name: Optional[str] = None
+    option_id: Optional[str] = None
+    option: Optional[str] = None
+    label: Optional[str] = None
+    values: Optional[List[Dict[str, Any]]] = None
+
+    class Config:
+        extra = "allow"
+
+class DatasetMetadata(BaseModel):
+    id: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    headers: Optional[List[str]] = None
+    is_based_on: Optional[Dict[str, Any]] = None
+    type: Optional[str] = None
+    dimensions: Optional[List[Dict[str, Any]]] = None
+    dimension_groups: Optional[List[Dict[str, Any]]] = None
+
+    class Config:
+        extra = "allow"
+
+# Model for TS (Topic Summary) dataset response structure
+class TSDatasetResponse(BaseModel):
+    observations: List[Union[str, int, float]]
+    total_observations: Optional[int] = None
+    dimensions: Optional[List[Dict[str, Any]]] = None
+    headers: Optional[List[str]] = None
+    metadata: Optional[DatasetMetadata] = None
+
+    @root_validator(pre=True)
+    def ensure_observations_list(cls, values):
+        """Ensure observations is always a list, even if it's None in the input data"""
+        if "observations" not in values or values["observations"] is None:
+            values["observations"] = []
+        return values
+
+    class Config:
+        extra = "allow"  # Allow extra fields in the response
+
+# New models for RM dataset response structure
+class RMDimensionItem(BaseModel):
+    dimension_id: Optional[str] = None
+    option: Optional[str] = None
+    option_id: Optional[str] = None
+
+    class Config:
+        extra = "allow"  # Allow additional fields
+
+class RMObservation(BaseModel):
+    observation: Optional[Union[str, int, float]] = None
+    dimensions: Optional[Union[Dict[str, str], List[RMDimensionItem], List[Dict[str, Any]]]] = None
+
+    class Config:
+        extra = "allow"  # Allow additional fields
+
+class RMDimensionInfo(BaseModel):
+    name: Optional[str] = None
+    dimension_name: Optional[str] = None
+    id: Optional[str] = None
+    label: Optional[str] = None
+    options: Optional[List[Dict[str, Any]]] = None
+
+    class Config:
+        extra = "allow"  # Allow additional fields
+
+class RMDatasetResponse(BaseModel):
+    observations: Optional[List[Union[str, int, float, Dict[str, Any], RMObservation]]] = []
+    dimensions: Optional[Union[Dict[str, Any], List[RMDimensionInfo], List[Dict[str, Any]]]] = None
+    headers: Optional[List[str]] = None
+    total_observations: Optional[int] = None
+
+    @root_validator(pre=True)
+    def ensure_observations_list(cls, values):
+        """Ensure observations is always a list, even if it's None in the input data"""
+        if "observations" not in values or values["observations"] is None:
+            values["observations"] = []
+        return values
+
+    class Config:
+        extra = "allow"  # Allow extra fields in the response

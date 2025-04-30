@@ -1,17 +1,19 @@
 import requests
 import time
 import os
+import json
 from typing import Optional, Dict, Any, List
 
-from models import (
+from .models import (
     FilterResponse,
     FilterSubmitResponse,
     FilterOutputResponse,
     FilterRequest,
     DatasetIdentifier,
     DimensionFilter,
+    Dimension
 )
-from utils import ensure_dir
+from .utils import ensure_dir
 
 BASE_URL = "https://api.beta.ons.gov.uk/v1"
 
@@ -23,7 +25,11 @@ class FilterProcessor:
 
     def __init__(self, base_url: str = BASE_URL):
         self.base_url = base_url
-        self.headers = {"Content-Type": "application/json"}
+        self.session = requests.Session()
+        self.session.headers.update({
+            "User-Agent": "ONSDataBot/1.0.0 (NHS-Code-Project)",
+            "Content-Type": "application/json"
+        })
 
     def create_filter(self, payload: Dict[str, Any]) -> FilterResponse:
         """
@@ -36,7 +42,7 @@ class FilterProcessor:
             FilterResponse: The filter response containing the filter ID
         """
         filter_url = f"{self.base_url}/filters"
-        response = requests.post(filter_url, headers=self.headers, json=payload)
+        response = self.session.post(filter_url, json=payload)
         response.raise_for_status()
         filter_response_data = response.json()
         return FilterResponse(**filter_response_data)
@@ -52,39 +58,45 @@ class FilterProcessor:
             FilterSubmitResponse: The response containing the filter output ID
         """
         submit_url = f"{self.base_url}/filters/{filter_id}/submit"
-        submit_response = requests.post(submit_url, headers=self.headers, json={})
+        submit_response = self.session.post(submit_url, json={})
         submit_response.raise_for_status()
         submit_data = submit_response.json()
         return FilterSubmitResponse(**submit_data)
 
     def poll_filter_output(
-        self, filter_output_id: str, max_wait: int = 300, wait_interval: int = 10
+        self, filter_output_id: str, max_wait: int = 1800, wait_interval: int = 10
     ) -> Optional[str]:
         """
         Poll the filter output until the CSV download link is available
 
         Args:
             filter_output_id: The ID of the filter output to poll
-            max_wait: Maximum wait time in seconds
+            max_wait: Maximum wait time in seconds (default: 30 minutes)
             wait_interval: Seconds between polls
 
         Returns:
             Optional[str]: The CSV download URL if available, None otherwise
         """
         filter_output_url = f"{self.base_url}/filter-outputs/{filter_output_id}"
-        print(f"Polling filter output URL: {filter_output_url}")
+        print(f"Polling filter output URL: {filter_output_url} (timeout: {max_wait}s)")
 
         elapsed = 0
         csv_href = None
+        current_interval = wait_interval
+        poll_count = 0
 
         while (not csv_href) and (elapsed < max_wait):
+            poll_count += 1
             print(
-                f"CSV download link not ready yet. Waiting for {wait_interval} seconds..."
+                f"CSV download link not ready yet. Poll attempt {poll_count}, waiting for {current_interval} seconds... (elapsed: {elapsed}s)"
             )
-            time.sleep(wait_interval)
-            elapsed += wait_interval
+            time.sleep(current_interval)
+            elapsed += current_interval
 
-            poll_response = requests.get(filter_output_url)
+            # Use exponential backoff (cap at 60s intervals)
+            current_interval = min(current_interval * 1.5, 60)
+
+            poll_response = self.session.get(filter_output_url)
             poll_response.raise_for_status()
             filter_response = poll_response.json()
 
@@ -113,7 +125,7 @@ class FilterProcessor:
             str: The path to the saved CSV file
         """
         print(f"Downloading CSV from: {csv_url}")
-        csv_response = requests.get(csv_url)
+        csv_response = self.session.get(csv_url)
         csv_response.raise_for_status()
 
         # Ensure directory exists
@@ -177,6 +189,7 @@ class FilterProcessor:
         area_codes: List[str],
         edition: str = "2021",
         version: int = 1,
+        additional_dimensions: Optional[List[Dimension]] = None
     ) -> FilterRequest:
         """
         Create a filter request for the given parameters
@@ -188,12 +201,54 @@ class FilterProcessor:
             area_codes: List of area codes to include in the filter
             edition: The dataset edition
             version: The dataset version
+            additional_dimensions: Optional list of additional Dimension objects to include
 
         Returns:
             FilterRequest: The constructed filter request
         """
-        return FilterRequest(
-            dataset=DatasetIdentifier(id=dataset_id, edition=edition, version=version),
-            population_type=population_type,
-            dimensions=[DimensionFilter(name=area_type, options=area_codes)],
+        # Create the dataset identifier
+        dataset = DatasetIdentifier(
+            id=dataset_id,
+            edition=edition,
+            version=version
         )
+
+        # Create the geography dimension filter
+        geography_filter = DimensionFilter(
+            name=area_type,
+            is_area_type=True,
+            options=area_codes
+        )
+
+        # Start with the geography dimension
+        dimensions = [geography_filter]
+
+        # Add additional dimensions if provided
+        if additional_dimensions:
+            for dim in additional_dimensions:
+                # Skip if it's the same as our geography dimension
+                if dim.id.lower() == area_type.lower():
+                    continue
+
+                # For each additional dimension, we need to fetch the options
+                try:
+                    # Here we would normally fetch options for each dimension
+                    # For simplicity, we're adding the dimension with an empty options list
+                    # This means "include all options"
+                    dimension_filter = DimensionFilter(
+                        name=dim.id,
+                        is_area_type=False,
+                        options=[]  # Empty list means include all options
+                    )
+                    dimensions.append(dimension_filter)
+                except Exception as e:
+                    print(f"Error adding dimension {dim.id}: {str(e)}")
+
+        # Create and return the filter request
+        filter_request = FilterRequest(
+            dataset=dataset,
+            population_type=population_type,
+            dimensions=dimensions
+        )
+
+        return filter_request
