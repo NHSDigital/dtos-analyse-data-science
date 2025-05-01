@@ -9,6 +9,7 @@ from ..models.ts_models import TSResponse
 
 logger = logging.getLogger(__name__)
 
+
 class TSApiClient(ONSApiClient):
     """
     Client for interacting with Time Series (TS) datasets in the ONS API.
@@ -17,11 +18,13 @@ class TSApiClient(ONSApiClient):
     """
 
     @with_retry(max_retries=3)
-    def get_dataset_data(self,
-                         dataset_id: str,
-                         area_codes: List[str],
-                         geo_level: str = "ctry",
-                         population_type: str = "UR") -> Dict[str, Any]:
+    def get_dataset_data(
+        self,
+        dataset_id: str,
+        area_codes: List[str],
+        geo_level: str = "ctry",
+        population_type: str = "UR",
+    ) -> Dict[str, Any]:
         """
         Retrieve data for a TS dataset for specific areas.
 
@@ -57,17 +60,19 @@ class TSApiClient(ONSApiClient):
         logger.debug(f"Response data keys: {data.keys()}")
 
         # Check if we have observations
-        observations_count = len(data.get('observations', []))
+        observations_count = len(data.get("observations", []))
         logger.debug(f"Found {observations_count} observations")
 
         return data
 
-    def batch_get_dataset_data(self,
-                               dataset_id: str,
-                               area_codes: List[str],
-                               geo_level: str = "ctry",
-                               batch_size: int = 100,
-                               population_type: str = "UR") -> Dict[str, Any]:
+    def batch_get_dataset_data(
+        self,
+        dataset_id: str,
+        area_codes: List[str],
+        geo_level: str = "ctry",
+        batch_size: int = 100,
+        population_type: str = "UR",
+    ) -> Dict[str, Any]:
         """
         Retrieve data for a TS dataset in batches to avoid URL length limitations.
 
@@ -84,7 +89,9 @@ class TSApiClient(ONSApiClient):
         if not area_codes:
             return {}
 
-        logger.info(f"Fetching TS dataset {dataset_id} for {geo_level} level in batches")
+        logger.info(
+            f"Fetching TS dataset {dataset_id} for {geo_level} level in batches"
+        )
 
         # For TS datasets, we need to combine observations from multiple batches
         all_observations = []
@@ -100,29 +107,35 @@ class TSApiClient(ONSApiClient):
         with tqdm(total=total_areas, desc=progress_desc, unit="areas") as pbar:
             # Process areas in batches
             for i in range(0, len(area_codes), batch_size):
-                batch = area_codes[i:i+batch_size]
+                batch = area_codes[i : i + batch_size]
                 batch_num = i // batch_size + 1
 
                 # Update progress bar description with batch info
-                pbar.set_description(f"{progress_desc} | Batch {batch_num}/{num_batches}")
+                pbar.set_description(
+                    f"{progress_desc} | Batch {batch_num}/{num_batches}"
+                )
 
                 try:
-                    data = self.get_dataset_data(dataset_id, batch, geo_level, population_type)
+                    data = self.get_dataset_data(
+                        dataset_id, batch, geo_level, population_type
+                    )
 
                     # Extract dimensions from first batch
-                    if dimensions is None and 'dimensions' in data:
-                        dimensions = data['dimensions']
+                    if dimensions is None and "dimensions" in data:
+                        dimensions = data["dimensions"]
 
                     # Extract headers from first batch
-                    if headers is None and 'headers' in data:
-                        headers = data['headers']
+                    if headers is None and "headers" in data:
+                        headers = data["headers"]
 
                     # Append observations to the combined list
-                    observations = data.get('observations', [])
+                    observations = data.get("observations", [])
                     if observations:
                         all_observations.extend(observations)
                         # Use tqdm.write to avoid breaking the progress bar
-                        tqdm.write(f"Added {len(observations)} observations from batch {batch_num}")
+                        tqdm.write(
+                            f"Added {len(observations)} observations from batch {batch_num}"
+                        )
                     else:
                         tqdm.write(f"No observations found in batch {batch_num}")
 
@@ -135,10 +148,12 @@ class TSApiClient(ONSApiClient):
 
         # Combine results into a single response
         combined_data = {
-            'dimensions': dimensions or [],
-            'observations': all_observations,
-            'headers': headers
+            "dimensions": dimensions or [],
+            "observations": all_observations,
+            "headers": headers,
         }
 
-        logger.info(f"Retrieved {len(all_observations)} total observations for dataset {dataset_id}")
+        logger.info(
+            f"Retrieved {len(all_observations)} total observations for dataset {dataset_id}"
+        )
         return combined_data

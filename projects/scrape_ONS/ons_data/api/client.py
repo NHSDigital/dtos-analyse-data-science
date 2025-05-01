@@ -7,9 +7,16 @@ from functools import wraps
 import json
 import os
 
-from ..models.common import Dataset, Dimension, DimensionOption, DimensionWithOptions, DatasetAvailability
+from ..models.common import (
+    Dataset,
+    Dimension,
+    DimensionOption,
+    DimensionWithOptions,
+    DatasetAvailability,
+)
 
 logger = logging.getLogger(__name__)
+
 
 def with_retry(max_retries=3, initial_delay=2.0, backoff_factor=2.0):
     """
@@ -23,6 +30,7 @@ def with_retry(max_retries=3, initial_delay=2.0, backoff_factor=2.0):
     Returns:
         Decorated function with retry logic
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -33,15 +41,28 @@ def with_retry(max_retries=3, initial_delay=2.0, backoff_factor=2.0):
                 try:
                     return func(*args, **kwargs)
                 except requests.exceptions.HTTPError as e:
-                    status_code = e.response.status_code if hasattr(e, 'response') else None
+                    status_code = (
+                        e.response.status_code if hasattr(e, "response") else None
+                    )
 
                     # Handle different HTTP errors
                     if status_code == 429:  # Too Many Requests
                         logger.warning(f"Rate limit exceeded (429): {str(e)}")
                         # Always retry with longer delay for rate limiting
                         retry = True
-                        delay = max(delay, 60.0)  # At least 60 seconds for rate limit errors
-                    elif status_code in [502, 503, 504, 520, 521, 522, 523, 524]:  # Server errors
+                        delay = max(
+                            delay, 60.0
+                        )  # At least 60 seconds for rate limit errors
+                    elif status_code in [
+                        502,
+                        503,
+                        504,
+                        520,
+                        521,
+                        522,
+                        523,
+                        524,
+                    ]:  # Server errors
                         logger.warning(f"Server error {status_code}: {str(e)}")
                         retry = attempt < max_retries
                     else:
@@ -70,6 +91,7 @@ def with_retry(max_retries=3, initial_delay=2.0, backoff_factor=2.0):
                 attempt += 1
 
         return wrapper
+
     return decorator
 
 
@@ -138,7 +160,7 @@ class ONSApiClient:
                     dataset = Dataset(
                         id=item.get("id", ""),
                         title=item.get("title", ""),
-                        description=item.get("description", "")
+                        description=item.get("description", ""),
                     )
                     datasets.append(dataset)
                     total_api_datasets += 1
@@ -156,7 +178,9 @@ class ONSApiClient:
 
                 # If we got fewer items than the limit, we've reached the end
                 if items_count < limit:
-                    logger.info(f"No more datasets to fetch (received {items_count} < limit {limit})")
+                    logger.info(
+                        f"No more datasets to fetch (received {items_count} < limit {limit})"
+                    )
                     break
 
                 # Add a small delay to avoid hitting rate limits
@@ -166,7 +190,9 @@ class ONSApiClient:
                 logger.error(f"Error fetching datasets page {page_count}: {str(e)}")
                 break
 
-        logger.info(f"Retrieved {total_api_datasets} standard datasets from {page_count} pages")
+        logger.info(
+            f"Retrieved {total_api_datasets} standard datasets from {page_count} pages"
+        )
 
         # Step 2: Discover Census datasets through population-types API
         try:
@@ -186,7 +212,9 @@ class ONSApiClient:
                 if pop_id:
                     pop_types.append(pop_id)
 
-            logger.info(f"Found {len(pop_types)} population types: {', '.join(pop_types)}")
+            logger.info(
+                f"Found {len(pop_types)} population types: {', '.join(pop_types)}"
+            )
 
             # For each population type, find dimensions which can indicate Census datasets
             census_datasets = []
@@ -208,11 +236,18 @@ class ONSApiClient:
                             # Example: "/datasets/TS008/editions/2021/versions/1/..."
                             if "/datasets/" in href:
                                 parts = href.split("/")
-                                idx = parts.index("datasets") if "datasets" in parts else -1
+                                idx = (
+                                    parts.index("datasets")
+                                    if "datasets" in parts
+                                    else -1
+                                )
 
                                 if idx >= 0 and idx + 1 < len(parts):
                                     dataset_id = parts[idx + 1]
-                                    if (dataset_id.startswith("TS") or dataset_id.startswith("RM")) and dataset_id not in census_datasets:
+                                    if (
+                                        dataset_id.startswith("TS")
+                                        or dataset_id.startswith("RM")
+                                    ) and dataset_id not in census_datasets:
                                         census_datasets.append(dataset_id)
 
                 # Small delay to avoid hitting rate limits
@@ -235,8 +270,10 @@ class ONSApiClient:
                             # Create dataset object with metadata
                             dataset = Dataset(
                                 id=dataset_id,
-                                title=meta_data.get("title", f"Census 2021 - {dataset_id}"),
-                                description=meta_data.get("description", "")
+                                title=meta_data.get(
+                                    "title", f"Census 2021 - {dataset_id}"
+                                ),
+                                description=meta_data.get("description", ""),
                             )
                             datasets.append(dataset)
                             logger.debug(f"Added Census dataset: {dataset_id}")
@@ -245,18 +282,22 @@ class ONSApiClient:
                             dataset = Dataset(
                                 id=dataset_id,
                                 title=f"Census 2021 - {dataset_id}",
-                                description="Census 2021 dataset"
+                                description="Census 2021 dataset",
                             )
                             datasets.append(dataset)
-                            logger.debug(f"Added Census dataset with basic info: {dataset_id}")
+                            logger.debug(
+                                f"Added Census dataset with basic info: {dataset_id}"
+                            )
 
                     except Exception as e:
-                        logger.error(f"Error fetching metadata for {dataset_id}: {str(e)}")
+                        logger.error(
+                            f"Error fetching metadata for {dataset_id}: {str(e)}"
+                        )
                         # Still add with basic info
                         dataset = Dataset(
                             id=dataset_id,
                             title=f"Census 2021 - {dataset_id}",
-                            description="Census 2021 dataset"
+                            description="Census 2021 dataset",
                         )
                         datasets.append(dataset)
 
@@ -271,7 +312,9 @@ class ONSApiClient:
                 logger.info("Checking census-observations for additional datasets")
 
                 # Check UR population type for census observations
-                obs_url = f"{self.base_url}/population-types/UR/census-observations?limit=10"
+                obs_url = (
+                    f"{self.base_url}/population-types/UR/census-observations?limit=10"
+                )
                 obs_response = requests.get(obs_url)
 
                 if obs_response.status_code == 200:
@@ -290,14 +333,19 @@ class ONSApiClient:
                                 dataset_id = parts[idx + 1]
 
                                 # Only add if not already in our list
-                                if (dataset_id.startswith("TS") or dataset_id.startswith("RM")) and not any(ds.id == dataset_id for ds in datasets):
+                                if (
+                                    dataset_id.startswith("TS")
+                                    or dataset_id.startswith("RM")
+                                ) and not any(ds.id == dataset_id for ds in datasets):
                                     dataset = Dataset(
                                         id=dataset_id,
                                         title=f"Census 2021 - {dataset_id}",
-                                        description="Census 2021 dataset discovered via census-observations"
+                                        description="Census 2021 dataset discovered via census-observations",
                                     )
                                     datasets.append(dataset)
-                                    logger.debug(f"Added Census dataset from observations: {dataset_id}")
+                                    logger.debug(
+                                        f"Added Census dataset from observations: {dataset_id}"
+                                    )
 
             except Exception as e:
                 logger.error(f"Error checking census-observations: {str(e)}")
@@ -338,9 +386,7 @@ class ONSApiClient:
             options = self.get_dimension_options(population_type, dimension_id)
 
             dimension = DimensionWithOptions(
-                id=dimension_id,
-                label=item.get("label", ""),
-                options=options
+                id=dimension_id, label=item.get("label", ""), options=options
             )
             dimensions.append(dimension)
 
@@ -348,7 +394,9 @@ class ONSApiClient:
         return dimensions
 
     @with_retry(max_retries=3)
-    def get_dimension_options(self, population_type: str, dimension_id: str) -> List[DimensionOption]:
+    def get_dimension_options(
+        self, population_type: str, dimension_id: str
+    ) -> List[DimensionOption]:
         """
         Get options for a specific dimension.
 
@@ -369,17 +417,16 @@ class ONSApiClient:
         options = []
 
         for item in data.get("items", []):
-            option = DimensionOption(
-                id=item.get("id", ""),
-                label=item.get("label", "")
-            )
+            option = DimensionOption(id=item.get("id", ""), label=item.get("label", ""))
             options.append(option)
 
         # logger.debug(f"Retrieved {len(options)} options for dimension {dimension_id}")
         return options
 
     @with_retry(max_retries=3)
-    def get_areas_for_level(self, geo_level: str, population_type: str = "UR") -> List[Dict[str, str]]:
+    def get_areas_for_level(
+        self, geo_level: str, population_type: str = "UR"
+    ) -> List[Dict[str, str]]:
         """
         Get all areas for a specific geographic level.
 
@@ -398,21 +445,24 @@ class ONSApiClient:
         cache_dir = "cache"
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
-        cache_filename = os.path.join(cache_dir, f"areas_{population_type}_{geo_level}.json")
+        cache_filename = os.path.join(
+            cache_dir, f"areas_{population_type}_{geo_level}.json"
+        )
 
         # If cache exists, use it
         if os.path.exists(cache_filename):
             logger.info(f"Using cached areas from {cache_filename}")
             try:
-                with open(cache_filename, "r", encoding='utf-8') as f:
+                with open(cache_filename, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 areas = []
                 for item in data:
-                    areas.append({
-                        "id": item.get("id", ""),
-                        "label": item.get("label", "")
-                    })
-                logger.info(f"Retrieved {len(areas)} areas for level {geo_level} from cache")
+                    areas.append(
+                        {"id": item.get("id", ""), "label": item.get("label", "")}
+                    )
+                logger.info(
+                    f"Retrieved {len(areas)} areas for level {geo_level} from cache"
+                )
                 return areas
             except Exception as e:
                 logger.warning(f"Error reading cache, will fetch from API: {e}")
@@ -431,10 +481,7 @@ class ONSApiClient:
             items = data.get("items", [])
 
             for item in items:
-                area = {
-                    "id": item.get("id", ""),
-                    "label": item.get("label", "")
-                }
+                area = {"id": item.get("id", ""), "label": item.get("label", "")}
                 areas.append(area)
 
             # Check for next page
@@ -448,7 +495,7 @@ class ONSApiClient:
 
         # Save to cache for future use
         try:
-            with open(cache_filename, "w", encoding='utf-8') as f:
+            with open(cache_filename, "w", encoding="utf-8") as f:
                 json.dump(areas, f, indent=2)
             logger.info(f"Saved areas to cache: {cache_filename}")
         except Exception as e:
@@ -456,7 +503,9 @@ class ONSApiClient:
 
         return areas
 
-    def _make_request(self, endpoint: str, params: Dict = None, max_retries: int = 3) -> Dict:
+    def _make_request(
+        self, endpoint: str, params: Dict = None, max_retries: int = 3
+    ) -> Dict:
         """Make a request to the ONS API with retry logic.
 
         Args:
@@ -476,7 +525,7 @@ class ONSApiClient:
 
                 if response.status_code == 429:  # Too Many Requests
                     # Implement exponential backoff
-                    wait_time = 2 ** retry_count
+                    wait_time = 2**retry_count
                     logger.warning(f"Rate limit hit. Waiting {wait_time} seconds...")
                     time.sleep(wait_time)
                     retry_count += 1
@@ -521,8 +570,9 @@ class ONSApiClient:
         response = self._make_request(endpoint)
         return response.get("items", [])
 
-    def check_dataset_availability(self, dataset_id: str, geo_level: str,
-                                   population_type: str = "UR") -> DatasetAvailability:
+    def check_dataset_availability(
+        self, dataset_id: str, geo_level: str, population_type: str = "UR"
+    ) -> DatasetAvailability:
         """Check if a dataset is available at a specific geographic level.
 
         Args:
@@ -537,14 +587,16 @@ class ONSApiClient:
             dataset_id=dataset_id,
             geo_level=geo_level,
             population_type=population_type,
-            is_available=False
+            is_available=False,
         )
 
         try:
             # Get a single area of the specified geographic level
             areas = self.get_areas(population_type, geo_level)
             if not areas:
-                result.error_message = f"No areas found for geographic level: {geo_level}"
+                result.error_message = (
+                    f"No areas found for geographic level: {geo_level}"
+                )
                 logger.warning(result.error_message)
                 return result
 
@@ -552,13 +604,13 @@ class ONSApiClient:
             test_area = areas[0]
             area_code = test_area.get("id")
             area_label = test_area.get("label", "Unknown")
-            logger.info(f"Testing dataset {dataset_id} availability at {geo_level} level using area: {area_label} ({area_code})")
+            logger.info(
+                f"Testing dataset {dataset_id} availability at {geo_level} level using area: {area_label} ({area_code})"
+            )
 
             # Make a test request to check if data is available
             endpoint = f"/datasets/{dataset_id}/editions/2021/versions/1/json"
-            params = {
-                "area-type": f"{geo_level},{area_code}"
-            }
+            params = {"area-type": f"{geo_level},{area_code}"}
 
             try:
                 response = self._make_request(endpoint, params)
@@ -566,14 +618,18 @@ class ONSApiClient:
                 # Check if the response contains observations with data
                 if response and "observations" in response and response["observations"]:
                     result.is_available = True
-                    logger.info(f"Dataset {dataset_id} is available at {geo_level} level")
+                    logger.info(
+                        f"Dataset {dataset_id} is available at {geo_level} level"
+                    )
                 else:
                     result.error_message = f"Dataset {dataset_id} doesn't contain observations at {geo_level} level"
                     logger.warning(result.error_message)
             except requests.exceptions.HTTPError as e:
-                status_code = e.response.status_code if hasattr(e, 'response') else None
+                status_code = e.response.status_code if hasattr(e, "response") else None
                 if status_code == 404:
-                    result.error_message = f"Dataset {dataset_id} not found at {geo_level} level (404)"
+                    result.error_message = (
+                        f"Dataset {dataset_id} not found at {geo_level} level (404)"
+                    )
                 else:
                     result.error_message = f"HTTP error {status_code} checking dataset {dataset_id} at {geo_level} level"
                 logger.warning(result.error_message)

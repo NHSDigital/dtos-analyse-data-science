@@ -7,6 +7,7 @@ A Python tool for retrieving, processing, and flattening census data from the UK
 This tool provides a clean, efficient way to download and process Census 2021 data from the ONS API. It supports both Time Series (TS) and Regular Matrix (RM) datasets, handling the specific requirements of each format while providing a consistent output structure.
 
 Key features:
+
 - Progress bar visualization for batch processing
 - Efficient handling of large datasets through batched requests
 - Automatic flattening of complex hierarchical data into tabular CSV format
@@ -29,6 +30,7 @@ Key features:
 
 1. Clone this repository
 2. Install dependencies:
+
 ```bash
 pip install requests pandas tqdm pydantic
 ```
@@ -60,26 +62,31 @@ python run_census.py --list-datasets
 ### Examples
 
 Download a Time Series dataset for all countries:
+
 ```bash
 python run_census.py --dataset TS030 --geo-level ctry
 ```
 
 Download a Regular Matrix dataset for all regions:
+
 ```bash
 python run_census.py --dataset RM097 --geo-level rgn
 ```
 
 Download a dataset for all geographic levels:
+
 ```bash
 python run_census.py --dataset TS030
 ```
 
 Use a specific output directory:
+
 ```bash
 python run_census.py --dataset TS030 --geo-level ctry --output-dir ./my_census_data
 ```
 
 Handle dataset availability at different geographic levels:
+
 ```bash
 # This will work (Religion data is available at OA level)
 python run_census.py --dataset TS030 --geo-level oa
@@ -95,9 +102,7 @@ python run_census.py --dataset TS009 --geo-level lsoa
 
 This tool connects to the Office for National Statistics (ONS) API to retrieve census data. The API is available at:
 
-```
-https://api.beta.ons.gov.uk/v1
-```
+[https://api.beta.ons.gov.uk/v1](https://api.beta.ons.gov.uk/v1)
 
 No API key is required as the ONS API is open and unrestricted.
 
@@ -127,6 +132,7 @@ The tool implements best practices to respect ONS API rate limits:
 - **Retry Logic**: Handles 429 responses with exponential backoff
 
 According to ONS Developer Hub, the following rate limits are applied:
+
 - 120 requests per 10 seconds for all site and API assets
 - 200 requests per 1 minute for all site and API assets
 - 15 requests per 10 seconds for high-demand assets
@@ -159,15 +165,21 @@ Examples include:
 
 While this tool requires you to know the dataset ID you want to download, you can browse available datasets through the [ONS website](https://www.ons.gov.uk/census) or use the API directly:
 
-```
+### Example API Request
+
+To list all available datasets, you can use the following API request:
+
+```http
 GET https://api.beta.ons.gov.uk/v1/datasets
 ```
+
+This endpoint returns a list of datasets available in the ONS API, including metadata such as dataset IDs, titles, and descriptions. You can use this information to identify the dataset ID required for your analysis.
 
 ## Output Format
 
 Data is saved in flattened CSV format with dimensions as columns:
 
-```
+``` csv
 ctry,ctry_code,religion_tb,religion_tb_code,observation
 England,E92000001,No religion,1,20715664
 England,E92000001,Christian,2,26167900
@@ -178,7 +190,7 @@ Each row represents a unique combination of dimensions with the corresponding ob
 
 ## Project Structure
 
-```
+``` plaintext
 ons_data/
 ├── __init__.py          # Package initialization
 ├── api/                 # API client components
@@ -205,7 +217,7 @@ The project includes a comprehensive test suite to ensure code quality and relia
 
 ### Test Structure
 
-```
+``` planetext
 tests/
 ├── unit/                # Unit tests
 │   ├── api/             # API client tests
@@ -305,6 +317,7 @@ If you encounter any issues:
 4. Verify that the dataset ID is correct and available in the ONS API
 
 Common issues:
+
 - **404 Errors**: The ONS API sometimes returns 404 errors for valid URLs. The tool includes retry logic.
 - **429 Too Many Requests**: If you hit rate limits, the tool will back off and retry automatically.
 - **Timeout Errors**: For very large datasets, try using a smaller geographic level or increasing batch size.
