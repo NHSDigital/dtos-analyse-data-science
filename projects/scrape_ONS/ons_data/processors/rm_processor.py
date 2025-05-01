@@ -11,6 +11,7 @@ from ..models.rm_models import RMObservation, RMResponse
 
 logger = logging.getLogger(__name__)
 
+
 class RMProcessor(BaseProcessor):
     """
     Processor for Regular Matrix (RM) datasets.
@@ -34,29 +35,31 @@ class RMProcessor(BaseProcessor):
         try:
             # Save debug info for potential later use
             debug_file = f"{output_file}.debug.json"
-            with open(debug_file, 'w') as f:
+            with open(debug_file, "w") as f:
                 json.dump(response, f, indent=2)
 
             logger.debug(f"Response keys: {list(response.keys())}")
 
             # Log response structure for debugging
-            if 'dimensions' in response:
+            if "dimensions" in response:
                 logger.debug(f"Dimensions in response: {len(response['dimensions'])}")
-                for i, dim in enumerate(response['dimensions']):
+                for i, dim in enumerate(response["dimensions"]):
                     if isinstance(dim, dict):
-                        logger.debug(f"Dimension {i}: {dim.get('dimension_name', 'unknown')}")
+                        logger.debug(
+                            f"Dimension {i}: {dim.get('dimension_name', 'unknown')}"
+                        )
 
             # RM datasets have the same response format as TS datasets
-            observations = response.get('observations', [])
+            observations = response.get("observations", [])
 
             if not observations:
                 logger.warning(f"No observations found in response")
                 return ""
 
             # For RM datasets (like TS), we simply write the values to CSV
-            with open(output_file, 'w', newline='') as f:
+            with open(output_file, "w", newline="") as f:
                 writer = csv.writer(f)
-                writer.writerow(['value'])
+                writer.writerow(["value"])
                 for value in observations:
                     writer.writerow([value])
 
@@ -97,7 +100,7 @@ class RMProcessor(BaseProcessor):
 
             if os.path.exists(debug_file):
                 try:
-                    with open(debug_file, 'r') as f:
+                    with open(debug_file, "r") as f:
                         metadata = json.load(f)
                     logger.info(f"Found debug file with metadata: {debug_file}")
                 except Exception as e:
@@ -109,23 +112,27 @@ class RMProcessor(BaseProcessor):
 
             # Read the input CSV values
             df = pd.read_csv(input_file)
-            values = df['value'].tolist() if 'value' in df.columns else []
+            values = df["value"].tolist() if "value" in df.columns else []
 
             if not values:
                 logger.warning(f"No values found in {input_file}")
                 return ""
 
             # Process the metadata to create dimension combinations
-            flat_rows, fieldnames = self._create_dimension_combinations(metadata, values)
+            flat_rows, fieldnames = self._create_dimension_combinations(
+                metadata, values
+            )
 
             if flat_rows:
                 # Write the flat CSV with dimension info
-                with open(output_file, 'w', newline='') as outfile:
+                with open(output_file, "w", newline="") as outfile:
                     writer = csv.DictWriter(outfile, fieldnames=fieldnames)
                     writer.writeheader()
                     writer.writerows(flat_rows)
 
-                logger.info(f"Created flattened file with {len(flat_rows)} rows at {output_file}")
+                logger.info(
+                    f"Created flattened file with {len(flat_rows)} rows at {output_file}"
+                )
                 return output_file
             else:
                 logger.warning("No rows generated to write to flattened CSV")
@@ -136,9 +143,9 @@ class RMProcessor(BaseProcessor):
             logger.error(traceback.format_exc())
             return ""
 
-    def _create_dimension_combinations(self,
-                                       metadata: Dict[str, Any],
-                                       values: List[str]) -> Tuple[List[Dict[str, str]], List[str]]:
+    def _create_dimension_combinations(
+        self, metadata: Dict[str, Any], values: List[str]
+    ) -> Tuple[List[Dict[str, str]], List[str]]:
         """
         Create all possible dimension combinations based on metadata.
 
@@ -152,7 +159,7 @@ class RMProcessor(BaseProcessor):
             - List of fieldnames for the CSV
         """
         # Extract dimension information
-        dimension_data = metadata.get('dimensions', [])
+        dimension_data = metadata.get("dimensions", [])
 
         # Get all possible dimension values
         dimensions = []
@@ -161,12 +168,12 @@ class RMProcessor(BaseProcessor):
         # Extract dimensions and options
         if isinstance(dimension_data, list):
             for dim in dimension_data:
-                if isinstance(dim, dict) and 'dimension_name' in dim:
-                    dim_name = dim.get('dimension_name')
+                if isinstance(dim, dict) and "dimension_name" in dim:
+                    dim_name = dim.get("dimension_name")
                     dimensions.append(dim_name)
                     # Store dimension values if available
-                    if 'options' in dim:
-                        dimension_values[dim_name] = dim['options']
+                    if "options" in dim:
+                        dimension_values[dim_name] = dim["options"]
 
         if not dimensions:
             logger.warning("No dimensions found in metadata")
@@ -179,7 +186,7 @@ class RMProcessor(BaseProcessor):
         for dim in dimensions:
             fieldnames.append(dim)
             fieldnames.append(f"{dim}_code")
-        fieldnames.append('observation')
+        fieldnames.append("observation")
 
         # Calculate the total number of combinations for each dimension
         dim_counts = []
@@ -193,7 +200,9 @@ class RMProcessor(BaseProcessor):
         for count in dim_counts:
             total_combinations *= count
 
-        logger.info(f"Total combinations: {total_combinations}, Observations: {len(values)}")
+        logger.info(
+            f"Total combinations: {total_combinations}, Observations: {len(values)}"
+        )
 
         # Generate all dimension combinations and map to observations
         flat_rows = []
@@ -215,14 +224,14 @@ class RMProcessor(BaseProcessor):
                     opt = options[indices[i]]
                     # Handle different option formats
                     if isinstance(opt, dict):
-                        row[dim] = opt.get('label', '')
-                        row[f"{dim}_code"] = opt.get('id', '')
+                        row[dim] = opt.get("label", "")
+                        row[f"{dim}_code"] = opt.get("id", "")
                     else:
                         row[dim] = str(opt)
                         row[f"{dim}_code"] = str(opt)
 
             # Add the observation value
-            row['observation'] = values[obs_index] if obs_index < len(values) else ''
+            row["observation"] = values[obs_index] if obs_index < len(values) else ""
             flat_rows.append(row)
 
             # Increment indices (like counting with carry)

@@ -15,9 +15,11 @@ from .api import ApiClientFactory
 from .processors import ProcessorFactory
 from .models.common import ONSConfig, BatchSizeConfig, DatasetType
 
+
 # Set up a custom formatter that includes timestamp but minimizes other info
 class MinimalFormatter(logging.Formatter):
     """Formatter that only shows minimal information to avoid disrupting progress bars"""
+
     def format(self, record):
         # For debug level, show more details
         if record.levelno <= logging.DEBUG:
@@ -25,6 +27,7 @@ class MinimalFormatter(logging.Formatter):
 
         # For info and above, just show the message
         return f"{record.levelname}: {record.getMessage()}"
+
 
 # Configure logging - Use minimal formatter to avoid disrupting progress bars
 def configure_logging(debug_mode=False):
@@ -54,6 +57,7 @@ def configure_logging(debug_mode=False):
     handler.setFormatter(formatter)
     root_logger.addHandler(handler)
 
+
 # Get module-level logger
 logger = logging.getLogger("ons_data")
 
@@ -65,35 +69,61 @@ def setup_parser():
     Returns:
         argparse.ArgumentParser: Configured argument parser
     """
-    parser = argparse.ArgumentParser(description='Retrieve and process census data from ONS API')
+    parser = argparse.ArgumentParser(
+        description="Retrieve and process census data from ONS API"
+    )
 
     # Create a mutually exclusive group for main commands
     main_group = parser.add_mutually_exclusive_group(required=True)
 
-    main_group.add_argument('--dataset', type=str,
-                        help='Dataset ID to retrieve (e.g., TS030 for Time Series, RM097 for Regular Matrix)')
+    main_group.add_argument(
+        "--dataset",
+        type=str,
+        help="Dataset ID to retrieve (e.g., TS030 for Time Series, RM097 for Regular Matrix)",
+    )
 
-    main_group.add_argument('--list-datasets', action='store_true',
-                        help='List all available datasets with IDs and names')
+    main_group.add_argument(
+        "--list-datasets",
+        action="store_true",
+        help="List all available datasets with IDs and names",
+    )
 
-    main_group.add_argument('--print-datasets', action='store_true',
-                        help='Print all available datasets in a simple format')
+    main_group.add_argument(
+        "--print-datasets",
+        action="store_true",
+        help="Print all available datasets in a simple format",
+    )
 
-    parser.add_argument('--geo-level', type=str, default=None,
-                        help='Geographic level to retrieve (e.g., ctry, rgn, la, msoa, lsoa, oa). '
-                             'If not specified, all standard levels will be processed.')
+    parser.add_argument(
+        "--geo-level",
+        type=str,
+        default=None,
+        help="Geographic level to retrieve (e.g., ctry, rgn, la, msoa, lsoa, oa). "
+        "If not specified, all standard levels will be processed.",
+    )
 
-    parser.add_argument('--output-dir', type=str, default=None,
-                        help='Output directory for data files. Defaults to data/{dataset_id}/')
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Output directory for data files. Defaults to data/{dataset_id}/",
+    )
 
-    parser.add_argument('--batch-size', type=int, default=None,
-                        help='Override the default batch size for area processing')
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=None,
+        help="Override the default batch size for area processing",
+    )
 
-    parser.add_argument('--population-type', type=str, default="UR",
-                        help='Population type for census data (default: UR)')
+    parser.add_argument(
+        "--population-type",
+        type=str,
+        default="UR",
+        help="Population type for census data (default: UR)",
+    )
 
-    parser.add_argument('--debug', action='store_true',
-                        help='Enable debug logging')
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
     return parser
 
@@ -109,7 +139,7 @@ def validate_args(args):
         bool: True if valid, False otherwise
     """
     # If we're just listing datasets or printing datasets, no further validation needed
-    if args.list_datasets or (hasattr(args, 'print_datasets') and args.print_datasets):
+    if args.list_datasets or (hasattr(args, "print_datasets") and args.print_datasets):
         return True
 
     # Check dataset ID format
@@ -127,7 +157,7 @@ def validate_args(args):
         return False
 
     # Check geo level if specified
-    valid_geo_levels = ['ctry', 'rgn', 'la', 'msoa', 'lsoa', 'oa']
+    valid_geo_levels = ["ctry", "rgn", "la", "msoa", "lsoa", "oa"]
     if args.geo_level and args.geo_level not in valid_geo_levels:
         logger.error(f"Invalid geographic level: {args.geo_level}")
         logger.info(f"Valid levels are: {', '.join(valid_geo_levels)}")
@@ -151,7 +181,7 @@ def create_config(args) -> ONSConfig:
     if args.geo_level:
         geo_levels = [args.geo_level]
     else:
-        geo_levels = ['ctry', 'rgn', 'la', 'msoa', 'lsoa', 'oa']
+        geo_levels = ["ctry", "rgn", "la", "msoa", "lsoa", "oa"]
 
     # Set up output directory
     output_dir = args.output_dir
@@ -162,7 +192,7 @@ def create_config(args) -> ONSConfig:
     batch_sizes = BatchSizeConfig()
     if args.batch_size:
         # Override all batch sizes
-        for level in ['ctry', 'rgn', 'la', 'msoa', 'lsoa', 'oa']:
+        for level in ["ctry", "rgn", "la", "msoa", "lsoa", "oa"]:
             setattr(batch_sizes, level, args.batch_size)
 
     # Create and return the config
@@ -171,7 +201,7 @@ def create_config(args) -> ONSConfig:
         geo_levels=geo_levels,
         population_type=args.population_type,
         output_dir=output_dir,
-        batch_sizes=batch_sizes
+        batch_sizes=batch_sizes,
     )
 
 
@@ -191,7 +221,7 @@ def download_data_for_level(
     geo_level: str,
     output_dir: str,
     batch_size: int,
-    population_type: str = "UR"
+    population_type: str = "UR",
 ) -> Optional[str]:
     """
     Download data for a specific geographic level.
@@ -222,16 +252,27 @@ def download_data_for_level(
 
     try:
         # First check if this dataset is available at this geographic level
-        logger.info(f"Checking if dataset {dataset_id} is available at geographic level {geo_level}")
-        availability = api_client.check_dataset_availability(dataset_id, geo_level, population_type)
+        logger.info(
+            f"Checking if dataset {dataset_id} is available at geographic level {geo_level}"
+        )
+        availability = api_client.check_dataset_availability(
+            dataset_id, geo_level, population_type
+        )
 
         if not availability.is_available:
-            error_msg = availability.error_message or f"Dataset {dataset_id} is not available at geographic level {geo_level}"
+            error_msg = (
+                availability.error_message
+                or f"Dataset {dataset_id} is not available at geographic level {geo_level}"
+            )
             logger.warning(error_msg)
-            logger.warning(f"Skipping geographic level {geo_level} for dataset {dataset_id}")
+            logger.warning(
+                f"Skipping geographic level {geo_level} for dataset {dataset_id}"
+            )
             return None
 
-        logger.info(f"Dataset {dataset_id} is available at geographic level {geo_level}, proceeding with download")
+        logger.info(
+            f"Dataset {dataset_id} is available at geographic level {geo_level}, proceeding with download"
+        )
 
         # Define temporary file for API response (we won't keep this)
         temp_file = os.path.join(output_dir, f"{dataset_id}_{geo_level}_raw.csv")
@@ -264,7 +305,7 @@ def download_data_for_level(
                 area_codes=area_codes,
                 geo_level=geo_level,
                 batch_size=batch_size,
-                population_type=population_type
+                population_type=population_type,
             )
         else:  # RM dataset
             response = api_client.batch_get_dataset_data(
@@ -272,7 +313,7 @@ def download_data_for_level(
                 area_codes=area_codes,
                 geo_level=geo_level,
                 batch_size=batch_size,
-                population_type=population_type
+                population_type=population_type,
             )
 
         # Process the response: First save to temp file
@@ -300,7 +341,9 @@ def download_data_for_level(
             logger.debug(f"Renamed debug file to {new_debug_file}")
 
         if flat_result:
-            logger.info(f"Successfully processed and flattened data for level {geo_level}")
+            logger.info(
+                f"Successfully processed and flattened data for level {geo_level}"
+            )
             return output_file
         else:
             logger.error(f"Failed to flatten data for level {geo_level}")
@@ -309,6 +352,7 @@ def download_data_for_level(
     except Exception as e:
         logger.error(f"Error processing level {geo_level}: {str(e)}")
         import traceback
+
         logger.debug(traceback.format_exc())
         return None
 
@@ -323,6 +367,7 @@ def list_datasets():
     try:
         # Create a base API client (dataset type doesn't matter for listing)
         from .api.client import ONSApiClient
+
         client = ONSApiClient()
 
         print("\n=== ONS DATASETS ===\n")
@@ -341,7 +386,9 @@ def list_datasets():
         print("- RM040: Age by sex by long-term health condition")
         print("- RM052: Country of birth by sex")
         print()
-        print("Note: The ONS API may not list all Census datasets in the general datasets endpoint.")
+        print(
+            "Note: The ONS API may not list all Census datasets in the general datasets endpoint."
+        )
         print("You may need to search for specific dataset IDs on the ONS website:")
         print("https://www.ons.gov.uk/census/census2021dictionary")
         print()
@@ -360,7 +407,11 @@ def list_datasets():
         # Group by dataset type
         ts_datasets = [ds for ds in datasets if ds.id.startswith("TS")]
         rm_datasets = [ds for ds in datasets if ds.id.startswith("RM")]
-        other_datasets = [ds for ds in datasets if not ds.id.startswith("TS") and not ds.id.startswith("RM")]
+        other_datasets = [
+            ds
+            for ds in datasets
+            if not ds.id.startswith("TS") and not ds.id.startswith("RM")
+        ]
 
         # Display results
         print("### AVAILABLE DATASETS FROM API ###")
@@ -405,6 +456,7 @@ def list_datasets():
     except Exception as e:
         logger.error(f"Error listing datasets: {str(e)}")
         import traceback
+
         logger.debug(traceback.format_exc())
 
 
@@ -419,6 +471,7 @@ def print_datasets():
     try:
         # Create a base API client
         from .api.client import ONSApiClient
+
         client = ONSApiClient()
 
         print("\n=== ONS DATASETS ===\n")
@@ -434,7 +487,11 @@ def print_datasets():
         # Separate TS and RM datasets
         ts_datasets = [ds for ds in datasets if ds.id.startswith("TS")]
         rm_datasets = [ds for ds in datasets if ds.id.startswith("RM")]
-        other_datasets = [ds for ds in datasets if not ds.id.startswith("TS") and not ds.id.startswith("RM")]
+        other_datasets = [
+            ds
+            for ds in datasets
+            if not ds.id.startswith("TS") and not ds.id.startswith("RM")
+        ]
 
         # Function to display datasets in pages
         def display_datasets(dataset_list, title):
@@ -479,27 +536,27 @@ def print_datasets():
 
                     choice = input("Enter choice: ").strip().lower()
 
-                    if choice == 'p' and current_page > 1:
+                    if choice == "p" and current_page > 1:
                         current_page -= 1
-                    elif choice == 'n' and current_page < total_pages:
+                    elif choice == "n" and current_page < total_pages:
                         current_page += 1
-                    elif choice == 'a':
-                        return 'all'  # Signal to go back to all types
-                    elif choice == 's':
-                        return 'skip'  # Signal to skip to next type
-                    elif choice == 'q':
-                        return 'quit'  # Signal to quit
+                    elif choice == "a":
+                        return "all"  # Signal to go back to all types
+                    elif choice == "s":
+                        return "skip"  # Signal to skip to next type
+                    elif choice == "q":
+                        return "quit"  # Signal to quit
                     # Any other input just refreshes the current page
                 else:
                     # If only one page, just ask to continue
                     if len(dataset_list) > 5:  # Only prompt if we have enough items
                         print("\n[Enter] Continue | [a] All Types | [q] Quit")
                         choice = input("Enter choice: ").strip().lower()
-                        if choice == 'a':
-                            return 'all'
-                        elif choice == 'q':
-                            return 'quit'
-                    return 'skip'  # Move to next type by default
+                        if choice == "a":
+                            return "all"
+                        elif choice == "q":
+                            return "quit"
+                    return "skip"  # Move to next type by default
 
         # Display all dataset types
         while True:
@@ -512,22 +569,22 @@ def print_datasets():
 
             choice = input("\nEnter choice (1-4 or q): ").strip().lower()
 
-            if choice == '1':
+            if choice == "1":
                 result = display_datasets(ts_datasets, "TIME SERIES (TS)")
-                if result == 'quit':
+                if result == "quit":
                     break
-            elif choice == '2':
+            elif choice == "2":
                 result = display_datasets(rm_datasets, "REGULAR MATRIX (RM)")
-                if result == 'quit':
+                if result == "quit":
                     break
-            elif choice == '3':
+            elif choice == "3":
                 result = display_datasets(other_datasets, "OTHER")
-                if result == 'quit':
+                if result == "quit":
                     break
-            elif choice == '4' or choice == '':
+            elif choice == "4" or choice == "":
                 # Just show summary
                 break
-            elif choice == 'q':
+            elif choice == "q":
                 return
             else:
                 print("Invalid choice. Please try again.")
@@ -545,6 +602,7 @@ def print_datasets():
     except Exception as e:
         logger.error(f"Error fetching datasets: {str(e)}")
         import traceback
+
         logger.debug(traceback.format_exc())
 
 
@@ -567,7 +625,7 @@ def main():
         return
 
     # Handle print datasets command
-    if hasattr(args, 'print_datasets') and args.print_datasets:
+    if hasattr(args, "print_datasets") and args.print_datasets:
         print_datasets()
         return
 
@@ -596,7 +654,7 @@ def main():
                 geo_level=geo_level,
                 output_dir=config.output_dir,
                 batch_size=batch_size,
-                population_type=config.population_type
+                population_type=config.population_type,
             )
 
             if output_file:
@@ -609,7 +667,13 @@ def main():
                         config.dataset_id, geo_level, config.population_type
                     )
                     if not availability.is_available:
-                        skipped_levels.append((geo_level, availability.error_message or "Dataset not available at this level"))
+                        skipped_levels.append(
+                            (
+                                geo_level,
+                                availability.error_message
+                                or "Dataset not available at this level",
+                            )
+                        )
                     else:
                         failed_levels.append(geo_level)
                 else:
@@ -650,23 +714,42 @@ def main():
     if results:
         logger.info(f"Completed processing for dataset {config.dataset_id}")
     else:
-        logger.error(f"Failed to process any geographic levels for dataset {config.dataset_id}")
+        logger.error(
+            f"Failed to process any geographic levels for dataset {config.dataset_id}"
+        )
         if skipped_levels and not failed_levels:
             # If all failures were due to dataset unavailability
-            print("\nSuggestion: This dataset may not be available at the requested geographic levels.")
+            print(
+                "\nSuggestion: This dataset may not be available at the requested geographic levels."
+            )
             print("Try using different geographic levels or a different dataset.")
-        elif len(config.geo_levels) == 1 and config.geo_levels[0] == 'oa' and skipped_levels:
+        elif (
+            len(config.geo_levels) == 1
+            and config.geo_levels[0] == "oa"
+            and skipped_levels
+        ):
             # Special case for OA level, which is often not available
-            print("\nNote: Output Area (OA) level data is not available for all datasets.")
-            print("Try using a higher geographic level like LSOA, MSOA, or Local Authority (LA).")
+            print(
+                "\nNote: Output Area (OA) level data is not available for all datasets."
+            )
+            print(
+                "Try using a higher geographic level like LSOA, MSOA, or Local Authority (LA)."
+            )
 
     # Set exit code for system
     if not results:
         sys.exit(1)
 
 
-def process_dataset(dataset_id: str, geo_level: str = None, output_dir: str = None,
-                batch_size: int = None, population_type: str = "UR", debug: bool = False, **kwargs) -> Optional[str]:
+def process_dataset(
+    dataset_id: str,
+    geo_level: str = None,
+    output_dir: str = None,
+    batch_size: int = None,
+    population_type: str = "UR",
+    debug: bool = False,
+    **kwargs,
+) -> Optional[str]:
     """
     Process a dataset for a specific geographic level.
     This is a wrapper around download_data_for_level for backward compatibility.
@@ -710,7 +793,7 @@ def process_dataset(dataset_id: str, geo_level: str = None, output_dir: str = No
         geo_level=geo_level,
         output_dir=nested_output_dir,
         batch_size=batch_size,
-        population_type=population_type
+        population_type=population_type,
     )
 
     # The e2e tests expect a different naming convention
@@ -722,6 +805,7 @@ def process_dataset(dataset_id: str, geo_level: str = None, output_dir: str = No
             # Create a copy with the expected name for backward compatibility
             try:
                 import shutil
+
                 shutil.copy(result, alt_path)
                 return alt_path
             except Exception as e:
