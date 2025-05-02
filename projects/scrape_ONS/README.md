@@ -28,11 +28,10 @@ Key features:
 
 ### Setup
 
-1. Clone this repository
-2. Install dependencies:
+1. Install the requirments using poetry
 
 ```bash
-pip install requests pandas tqdm pydantic
+poetry install
 ```
 
 ## Usage
@@ -41,10 +40,10 @@ Run the tool from the command line:
 
 ```bash
 # Download a dataset
-python run_census.py --dataset TS030 --geo-level ctry
+poetry run python run_census.py --dataset TS030 --geo-level ctry
 
 # List all available datasets
-python run_census.py --list-datasets
+poetry run python run_census.py --list-datasets
 ```
 
 ### Command-line Arguments
@@ -64,38 +63,38 @@ python run_census.py --list-datasets
 Download a Time Series dataset for all countries:
 
 ```bash
-python run_census.py --dataset TS030 --geo-level ctry
+poetry run python run_census.py --dataset TS030 --geo-level ctry
 ```
 
 Download a Regular Matrix dataset for all regions:
 
 ```bash
-python run_census.py --dataset RM097 --geo-level rgn
+poetry run python run_census.py --dataset RM097 --geo-level rgn
 ```
 
 Download a dataset for all geographic levels:
 
 ```bash
-python run_census.py --dataset TS030
+poetry run python run_census.py --dataset TS030
 ```
 
 Use a specific output directory:
 
 ```bash
-python run_census.py --dataset TS030 --geo-level ctry --output-dir ./my_census_data
+poetry run python run_census.py --dataset TS030 --geo-level ctry --output-dir ./my_census_data
 ```
 
 Handle dataset availability at different geographic levels:
 
 ```bash
 # This will work (Religion data is available at OA level)
-python run_census.py --dataset TS030 --geo-level oa
+poetry run python run_census.py --dataset TS030 --geo-level oa
 
 # This will show an availability error (dataset not available at OA level)
-python run_census.py --dataset TS009 --geo-level oa
+poetry run python run_census.py --dataset TS009 --geo-level oa
 
 # Try a different geographic level instead
-python run_census.py --dataset TS009 --geo-level lsoa
+poetry run python run_census.py --dataset TS009 --geo-level lsoa
 ```
 
 ## ONS API Integration
@@ -232,18 +231,18 @@ To run the test suite:
 
 ```bash
 # Run all tests
-python -m pytest tests/
+poetry run python -m pytest tests/
 
 # Run unit tests only
-python -m pytest tests/unit/
+poetry run python -m pytest tests/unit/
 
 # Run specific test modules
-python -m pytest tests/unit/api/
-python -m pytest tests/unit/models/
-python -m pytest tests/unit/processors/
+poetry run python -m pytest tests/unit/api/
+poetry run python -m pytest tests/unit/models/
+poetry run python -m pytest tests/unit/processors/
 
 # Run with coverage report
-python -m pytest tests/ --cov=ons_data
+poetry run python -m pytest tests/ --cov=ons_data
 ```
 
 ### Test Coverage
