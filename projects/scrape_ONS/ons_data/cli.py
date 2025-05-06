@@ -127,7 +127,7 @@ def setup_parser():
     parser.add_argument(
         "--use-filter",
         action="store_true",
-        help="Use ONS Filter API for data retrieval (recommended for large datasets)"
+        help="Use ONS Filter API for data retrieval (recommended for large datasets)",
     )
 
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
@@ -310,11 +310,13 @@ def download_data_for_level(
                 dataset_id=dataset_id,
                 geo_level=geo_level,
                 output_dir=output_dir,
-                population_type=population_type
+                population_type=population_type,
             )
 
             if not filtered_file:
-                logger.error(f"Failed to retrieve data using filter API for level {geo_level}")
+                logger.error(
+                    f"Failed to retrieve data using filter API for level {geo_level}"
+                )
                 return None
 
             # Also create a debug.json file for consistency
@@ -322,13 +324,15 @@ def download_data_for_level(
             try:
                 # Get minimal metadata for debug file
                 areas = api_client.get_areas_for_level(geo_level, population_type)
-                sample_area_codes = [area["id"] for area in areas[:5]]  # Just get a few areas
+                sample_area_codes = [
+                    area["id"] for area in areas[:5]
+                ]  # Just get a few areas
 
                 sample_data = api_client.get_dataset_data(
                     dataset_id=dataset_id,
                     area_codes=sample_area_codes,
                     geo_level=geo_level,
-                    population_type=population_type
+                    population_type=population_type,
                 )
 
                 # Save minimal debug info
@@ -336,9 +340,13 @@ def download_data_for_level(
                     json.dump(sample_data, f, indent=2)
                 logger.debug(f"Created debug file with sample metadata: {debug_file}")
             except Exception as e:
-                logger.warning(f"Failed to create debug file, but data was retrieved: {str(e)}")
+                logger.warning(
+                    f"Failed to create debug file, but data was retrieved: {str(e)}"
+                )
 
-            logger.info(f"Successfully retrieved data for level {geo_level} using filter API")
+            logger.info(
+                f"Successfully retrieved data for level {geo_level} using filter API"
+            )
             return filtered_file
         else:
             # Use the original batch processing method for smaller datasets
@@ -374,17 +382,20 @@ def download_data_for_level(
                 )
 
             # Process the response: First save to temp file
-            temp_result = processor.process_response(response, temp_file,
-                                                  area_metadata={"area_codes": area_codes})
+            temp_result = processor.process_response(
+                response, temp_file, area_metadata={"area_codes": area_codes}
+            )
 
             if not temp_result:
                 logger.error(f"Failed to process data for level {geo_level}")
                 return None
 
             # Then directly flatten it to the final output file with area metadata
-            flat_result = processor.flatten_data(temp_file, output_file,
-                                               area_metadata={"area_codes": area_codes,
-                                                            "geo_level": geo_level})
+            flat_result = processor.flatten_data(
+                temp_file,
+                output_file,
+                area_metadata={"area_codes": area_codes, "geo_level": geo_level},
+            )
 
             # Remove the temporary file
             if os.path.exists(temp_file):

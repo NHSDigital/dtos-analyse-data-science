@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 def with_retry_and_backoff(max_retries=5, initial_delay=2.0, backoff_factor=2.0):
     """Decorator for retry with exponential backoff, with handling for 429 and 413 status codes."""
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -25,23 +26,37 @@ def with_retry_and_backoff(max_retries=5, initial_delay=2.0, backoff_factor=2.0)
 
                     # Handle rate limiting (429)
                     if status_code == 429:
-                        retry_after = int(e.response.headers.get('Retry-After', delay))
-                        logger.warning(f"Rate limited (429). Waiting {retry_after} seconds.")
+                        retry_after = int(e.response.headers.get("Retry-After", delay))
+                        logger.warning(
+                            f"Rate limited (429). Waiting {retry_after} seconds."
+                        )
                         time.sleep(retry_after)
                     # Handle payload too large (413)
                     elif status_code == 413:
-                        logger.warning(f"Request failed: 413 Payload Too Large. The area list is too large for the API.")
+                        logger.warning(
+                            f"Request failed: 413 Payload Too Large. The area list is too large for the API."
+                        )
                         if attempt < max_retries - 1:
-                            logger.warning(f"Retrying in {delay:.1f}s. Consider reducing the batch size.")
+                            logger.warning(
+                                f"Retrying in {delay:.1f}s. Consider reducing the batch size."
+                            )
                             time.sleep(delay)
                             delay *= backoff_factor
                         else:
-                            logger.error("Maximum retries reached for payload too large error.")
-                            logger.error("Recommendation: Split the area list into smaller batches of 5000 or fewer areas.")
-                            raise RuntimeError("Payload too large. Split into smaller batches.") from e
+                            logger.error(
+                                "Maximum retries reached for payload too large error."
+                            )
+                            logger.error(
+                                "Recommendation: Split the area list into smaller batches of 5000 or fewer areas."
+                            )
+                            raise RuntimeError(
+                                "Payload too large. Split into smaller batches."
+                            ) from e
                     else:
                         # For other errors, use exponential backoff
-                        logger.warning(f"Request failed: {str(e)}. Retrying in {delay:.1f}s")
+                        logger.warning(
+                            f"Request failed: {str(e)}. Retrying in {delay:.1f}s"
+                        )
                         time.sleep(delay)
                         delay *= backoff_factor
                 except Exception as e:
@@ -55,6 +70,7 @@ def with_retry_and_backoff(max_retries=5, initial_delay=2.0, backoff_factor=2.0)
                 raise last_exception
 
         return wrapper
+
     return decorator
 
 
@@ -66,9 +82,16 @@ class ONSFilterClient:
         self.session = requests.Session()
 
     @with_retry_and_backoff(max_retries=5)
-    def create_filter(self, dataset_id, edition="2021", version=1,
-                      population_type="UR", geo_level=None, area_codes=None,
-                      extra_dimensions=None):
+    def create_filter(
+        self,
+        dataset_id,
+        edition="2021",
+        version=1,
+        population_type="UR",
+        geo_level=None,
+        area_codes=None,
+        extra_dimensions=None,
+    ):
         """
         Create a new filter for a dataset.
 
@@ -86,13 +109,9 @@ class ONSFilterClient:
         """
         # Prepare filter request payload
         filter_payload = {
-            "dataset": {
-                "id": dataset_id,
-                "edition": edition,
-                "version": version
-            },
+            "dataset": {"id": dataset_id, "edition": edition, "version": version},
             "population_type": population_type,
-            "dimensions": []
+            "dimensions": [],
         }
 
         # Add geographic dimension if specified
@@ -100,7 +119,7 @@ class ONSFilterClient:
             geo_dimension = {
                 "name": geo_level,
                 "is_area_type": True,
-                "options": area_codes
+                "options": area_codes,
             }
             filter_payload["dimensions"].append(geo_dimension)
 
@@ -174,10 +193,10 @@ class ONSFilterClient:
         response = self.session.get(download_url, stream=True)
         response.raise_for_status()
 
-        total_size = int(response.headers.get('content-length', 0))
+        total_size = int(response.headers.get("content-length", 0))
         chunk_size = 8192
 
-        with open(output_file, 'wb') as f:
+        with open(output_file, "wb") as f:
             for chunk in response.iter_content(chunk_size=chunk_size):
                 f.write(chunk)
 
