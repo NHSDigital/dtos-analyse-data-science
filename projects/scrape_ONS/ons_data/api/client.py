@@ -2,7 +2,7 @@ import requests
 import logging
 import time
 import random
-from typing import Dict, List, Any, Optional, Union, Callable
+from typing import Dict, List, Any, Optional, Union, Callable, Tuple
 from functools import wraps
 import json
 import os
@@ -715,20 +715,55 @@ class ONSApiClient:
             output_file: Path to save the output file
             population_type: Population type (default: "UR")
             max_poll_attempts: Maximum number of attempts to poll for filter completion
-            poll_interval: Time in seconds between poll attempts
+            poll_interval: Time in seconds between polling attempts
 
         Returns:
             Path to the downloaded file or None if failed
         """
         import time
+        import requests
 
         try:
+            # Fetch dataset metadata to identify available dimensions
+            extra_dimensions = []
+
+            try:
+                metadata_url = f"{self.base_url}/datasets/{dataset_id}/editions/2021/versions/1"
+                logger.info(f"Fetching metadata for dataset {dataset_id}")
+                response = requests.get(metadata_url)
+
+                if response.status_code == 200:
+                    metadata = response.json()
+                    dimensions = metadata.get('dimensions', [])
+
+                    # Add non-geographic dimensions to the filter
+                    for dim in dimensions:
+                        dim_name = dim.get('name', '')
+                        # Skip all geographic dimensions, not just the one matching geo_level
+                        # Common geographic levels: ctry, rgn, la, ltla, msoa, lsoa, oa
+                        geo_levels = ['ctry', 'rgn', 'la', 'ltla', 'msoa', 'lsoa', 'oa']
+                        if dim_name not in geo_levels and not dim_name.lower() in [level.lower() for level in geo_levels]:
+                            logger.info(f"Including dimension: {dim_name}")
+                            extra_dimensions.append({"name": dim_name})
+
+                    if extra_dimensions:
+                        logger.info(f"Including {len(extra_dimensions)} additional dimensions for dataset {dataset_id}")
+                else:
+                    logger.warning(f"Failed to fetch dataset metadata: {response.status_code}")
+            except Exception as e:
+                logger.warning(f"Error fetching dataset metadata: {str(e)}")
+                # Fallback for TS030 if metadata fetch fails
+                if dataset_id == "TS030":
+                    logger.info("Using fallback religion dimension for TS030")
+                    extra_dimensions = [{"name": "religion_tb"}]
+
             # Create filter
             filter_response = filter_client.create_filter(
                 dataset_id=dataset_id,
                 population_type=population_type,
                 geo_level=geo_level,
-                area_codes=area_codes
+                area_codes=area_codes,
+                extra_dimensions=extra_dimensions
             )
             filter_id = filter_response["filter_id"]
             logger.info(f"Created filter with ID: {filter_id}")
@@ -766,47 +801,95 @@ class ONSApiClient:
                         }
                     }
 
-                    # Fetch a small sample of the data to get dimension information
+                    # Try to fetch dimension information from sample data
                     # This is needed because the filter API doesn't include dimension breakdown
                     try:
                         if dataset_id.startswith("TS"):
-                            from ..api.ts_client import TSApiClient
-                            sample_client = TSApiClient(self.base_url)
-                            # Get sample for first 5 areas or fewer
-                            sample_areas = area_codes[:5]
-                            sample_response = sample_client.get_dataset_data_for_areas(
-                                dataset_id, geo_level, sample_areas, population_type
-                            )
-                            if sample_response:
-                                # Add dimensions from sample response
-                                debug_data["dimensions"] = sample_response.get("dimensions", [])
-                                debug_data["sample_response"] = True
+                            try:
+                                from ..api.ts_client import TSApiClient
+                                ts_client = TSApiClient(self.base_url)
+                                # Get sample for first 5 areas or fewer
+                                sample_areas = area_codes[:5]
+                                try:
+                                    # Try the method that matches the client implementation
+                                    sample_response = ts_client.get_dataset_data(
+                                        dataset_id=dataset_id,
+                                        area_codes=sample_areas,
+                                        geo_level=geo_level,
+                                        population_type=population_type
+                                    )
+                                    if sample_response:
+                                        debug_data["dimensions"] = sample_response.get("dimensions", [])
+                                        debug_data["sample_response"] = True
+                                except AttributeError:
+                                    # Try alternative method
+                                    logger.debug("Trying alternative method for TS client")
+                                    sample_response = ts_client.get_timeseries_data(
+                                        dataset_id=dataset_id,
+                                        geo_level=geo_level,
+                                        area_codes=sample_areas,
+                                        population_type=population_type
+                                    )
+                                    if sample_response:
+                                        debug_data["dimensions"] = sample_response.get("dimensions", [])
+                                        debug_data["sample_response"] = True
+                            except Exception as e:
+                                logger.warning(f"Failed to get TS dimension sample: {str(e)}")
+
                         elif dataset_id.startswith("RM"):
-                            from ..api.rm_client import RMApiClient
-                            sample_client = RMApiClient(self.base_url)
-                            # Get sample for first 5 areas or fewer
-                            sample_areas = area_codes[:5]
-                            sample_response = sample_client.get_dataset_data_for_areas(
-                                dataset_id, geo_level, sample_areas, population_type
-                            )
-                            if sample_response:
-                                # Add dimensions from sample response
-                                debug_data["dimensions"] = sample_response.get("dimensions", [])
-                                debug_data["sample_response"] = True
+                            try:
+                                from ..api.rm_client import RMApiClient
+                                rm_client = RMApiClient(self.base_url)
+                                # Get sample for first 5 areas or fewer
+                                sample_areas = area_codes[:5]
+                                try:
+                                    # Try the method that matches the client implementation
+                                    sample_response = rm_client.get_dataset_data(
+                                        dataset_id=dataset_id,
+                                        area_codes=sample_areas,
+                                        geo_level=geo_level,
+                                        population_type=population_type
+                                    )
+                                    if sample_response:
+                                        debug_data["dimensions"] = sample_response.get("dimensions", [])
+                                        debug_data["sample_response"] = True
+                                except AttributeError:
+                                    # Try alternative method
+                                    logger.debug("Trying alternative method for RM client")
+                                    sample_response = rm_client.get_multivariate_data(
+                                        dataset_id=dataset_id,
+                                        geo_level=geo_level,
+                                        area_codes=sample_areas,
+                                        population_type=population_type
+                                    )
+                                    if sample_response:
+                                        debug_data["dimensions"] = sample_response.get("dimensions", [])
+                                        debug_data["sample_response"] = True
+                            except Exception as e:
+                                logger.warning(f"Failed to get RM dimension sample: {str(e)}")
+
+                        # Still save any dimensions from the filter response as fallback
+                        if not debug_data.get("dimensions") and filter_output.get("dimensions"):
+                            debug_data["dimensions"] = filter_output.get("dimensions", [])
+                            logger.info("Using dimensions from filter response as fallback")
+
+                        logger.info(f"Successfully extracted dimension information for {dataset_id}")
+
+                        # Save the debug information
+                        import json
+                        with open(debug_file, "w", encoding="utf-8") as f:
+                            json.dump(debug_data, f, indent=2)
                     except Exception as e:
-                        logger.warning(f"Failed to get dimension sample: {str(e)}")
+                        logger.warning(f"Error extracting dimension information: {str(e)}")
 
-                    # Save the debug information
-                    import json
-                    with open(debug_file, "w", encoding="utf-8") as f:
-                        json.dump(debug_data, f, indent=2)
-
+                    # Return the output file path
                     return output_file
 
                 # If not ready, wait and try again
                 logger.info(f"Filter still processing, waiting {poll_interval} seconds")
                 time.sleep(poll_interval)
 
+            # If we get here, we've exceeded the maximum polling attempts
             logger.error("Filter did not complete within the expected time")
             return None
 

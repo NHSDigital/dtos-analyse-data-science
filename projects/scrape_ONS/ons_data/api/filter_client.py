@@ -67,7 +67,8 @@ class ONSFilterClient:
 
     @with_retry_and_backoff(max_retries=5)
     def create_filter(self, dataset_id, edition="2021", version=1,
-                      population_type="UR", geo_level=None, area_codes=None):
+                      population_type="UR", geo_level=None, area_codes=None,
+                      extra_dimensions=None):
         """
         Create a new filter for a dataset.
 
@@ -78,6 +79,7 @@ class ONSFilterClient:
             population_type: Population type (default: "UR")
             geo_level: Geographic level (e.g., lsoa, msoa)
             area_codes: List of area codes
+            extra_dimensions: List of additional dimensions to include
 
         Returns:
             Dict containing the filter creation response
@@ -101,6 +103,11 @@ class ONSFilterClient:
                 "options": area_codes
             }
             filter_payload["dimensions"].append(geo_dimension)
+
+        # Add any additional dimensions
+        if extra_dimensions:
+            for dim in extra_dimensions:
+                filter_payload["dimensions"].append(dim)
 
         # Create the filter
         url = f"{self.base_url}/filters"
