@@ -6,6 +6,8 @@ from typing import Dict, List, Any, Optional, Union, Callable
 from functools import wraps
 import json
 import os
+import pandas as pd
+import tempfile
 
 from ..models.common import (
     Dataset,
@@ -502,6 +504,317 @@ class ONSApiClient:
             logger.warning(f"Error saving to cache: {e}")
 
         return areas
+
+    def get_dataset_using_filter(
+        self,
+        dataset_id: str,
+        geo_level: str,
+        output_dir: str,
+        area_codes: List[str] = None,
+        population_type: str = "UR",
+        max_poll_attempts: int = 30,
+        poll_interval: int = 5,
+    ) -> Optional[str]:
+        """
+        Retrieve dataset using the filter API for large datasets.
+
+        Args:
+            dataset_id: The dataset ID (e.g., TS030)
+            geo_level: Geographic level (e.g., lsoa, msoa)
+            output_dir: Directory to save the output file
+            area_codes: List of area codes or None for all areas
+            population_type: Population type (default: "UR")
+            max_poll_attempts: Maximum number of attempts to poll for filter completion
+            poll_interval: Time in seconds between poll attempts
+
+        Returns:
+            Path to the downloaded file or None if failed
+        """
+        from .filter_client import ONSFilterClient
+        import os
+        import time
+        import pandas as pd
+        import tempfile
+        import json
+
+        logger.info(f"Using filter API to get {dataset_id} for level {geo_level}")
+
+        # Create filter client
+        filter_client = ONSFilterClient(self.base_url)
+
+        # If no area codes provided, get all areas for this level
+        if not area_codes:
+            areas = self.get_areas_for_level(geo_level, population_type)
+            area_codes = [area["id"] for area in areas]
+            logger.info(f"Retrieved {len(area_codes)} areas for level {geo_level}")
+
+        # Define the maximum batch size for area codes
+        # The ONS API seems to have issues with payloads larger than ~10,000 areas
+        max_batch_size = 5000
+
+        # Final output file path
+        final_output_file = os.path.join(output_dir, f"{dataset_id}_{geo_level}.csv")
+
+        # If the area list is too large, split into batches
+        if len(area_codes) > max_batch_size:
+            logger.info(f"Large area list detected ({len(area_codes)} areas), splitting into batches of {max_batch_size}")
+
+            # Split area codes into batches
+            batches = [area_codes[i:i + max_batch_size] for i in range(0, len(area_codes), max_batch_size)]
+            logger.info(f"Split into {len(batches)} batches")
+
+            # Create a list to store temp files with batch results
+            batch_files = []
+            batch_debug_files = []
+
+            # Process each batch
+            for batch_num, batch_areas in enumerate(batches, 1):
+                logger.info(f"Processing batch {batch_num}/{len(batches)} with {len(batch_areas)} areas")
+
+                try:
+                    # Create a temporary file for this batch
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as temp_file:
+                        batch_output_file = temp_file.name
+
+                    # Process this batch
+                    batch_result = self._process_filter_batch(
+                        filter_client,
+                        dataset_id,
+                        geo_level,
+                        batch_areas,
+                        batch_output_file,
+                        population_type,
+                        max_poll_attempts,
+                        poll_interval
+                    )
+
+                    if batch_result:
+                        batch_files.append(batch_result)
+                        # Add debug file to list if it exists
+                        debug_file = f"{batch_result}.debug.json"
+                        if os.path.exists(debug_file):
+                            batch_debug_files.append(debug_file)
+                    else:
+                        logger.error(f"Failed to process batch {batch_num}")
+                except Exception as e:
+                    logger.error(f"Error processing batch {batch_num}: {str(e)}")
+                    import traceback
+                    logger.debug(traceback.format_exc())
+
+            # Combine all batch results if we have any
+            if batch_files:
+                logger.info(f"Combining {len(batch_files)} batch results")
+
+                # Use pandas to read and combine all CSV files
+                dfs = []
+                for file in batch_files:
+                    try:
+                        df = pd.read_csv(file)
+                        dfs.append(df)
+                    except Exception as e:
+                        logger.warning(f"Error reading batch file {file}: {str(e)}")
+
+                if dfs:
+                    # Combine all dataframes
+                    combined_df = pd.concat(dfs, ignore_index=True)
+
+                    # Write combined results to the final output file
+                    combined_df.to_csv(final_output_file, index=False)
+                    logger.info(f"Saved combined results to {final_output_file}")
+
+                    # Combine debug files for dimension information
+                    combined_debug = {
+                        "dataset_id": dataset_id,
+                        "geo_level": geo_level,
+                        "population_type": population_type,
+                        "_area_metadata": {
+                            "geo_level": geo_level,
+                            "area_codes": area_codes
+                        }
+                    }
+
+                    # Find a debug file with dimensions
+                    dimension_data = None
+                    for debug_file in batch_debug_files:
+                        try:
+                            with open(debug_file, 'r', encoding='utf-8') as f:
+                                debug_data = json.load(f)
+                                if debug_data.get("dimensions") and (dimension_data is None or debug_data.get("sample_response", False)):
+                                    dimension_data = debug_data
+                                    logger.info(f"Using dimension data from {debug_file}")
+                                    if debug_data.get("sample_response", False):
+                                        # If we found a sample response, no need to check other files
+                                        break
+                        except Exception as e:
+                            logger.warning(f"Error reading debug file {debug_file}: {str(e)}")
+
+                    # If we found dimension data, add it to the combined debug
+                    if dimension_data:
+                        combined_debug["dimensions"] = dimension_data.get("dimensions", [])
+                        combined_debug["sample_response"] = dimension_data.get("sample_response", False)
+
+                    # Save combined debug information
+                    combined_debug_file = f"{final_output_file}.debug.json"
+                    try:
+                        with open(combined_debug_file, 'w', encoding='utf-8') as f:
+                            json.dump(combined_debug, f, indent=2)
+                        logger.info(f"Saved combined debug information to {combined_debug_file}")
+                    except Exception as e:
+                        logger.warning(f"Error saving combined debug file: {str(e)}")
+
+                    # Clean up temporary files
+                    for file in batch_files:
+                        try:
+                            os.remove(file)
+                            # Also remove debug file if it exists
+                            debug_file = f"{file}.debug.json"
+                            if os.path.exists(debug_file):
+                                os.remove(debug_file)
+                        except Exception as e:
+                            logger.warning(f"Failed to remove temp file {file}: {str(e)}")
+
+                    return final_output_file
+                else:
+                    logger.error("No valid batch results to combine")
+                    return None
+            else:
+                logger.error("All batches failed to process")
+                return None
+        else:
+            # For smaller area lists, process directly
+            return self._process_filter_batch(
+                filter_client,
+                dataset_id,
+                geo_level,
+                area_codes,
+                final_output_file,
+                population_type,
+                max_poll_attempts,
+                poll_interval
+            )
+
+    def _process_filter_batch(
+        self,
+        filter_client,
+        dataset_id: str,
+        geo_level: str,
+        area_codes: List[str],
+        output_file: str,
+        population_type: str = "UR",
+        max_poll_attempts: int = 30,
+        poll_interval: int = 5,
+    ) -> Optional[str]:
+        """
+        Process a single batch of area codes using the filter API.
+
+        Args:
+            filter_client: Instance of ONSFilterClient
+            dataset_id: The dataset ID (e.g., TS030)
+            geo_level: Geographic level (e.g., lsoa, msoa)
+            area_codes: List of area codes for this batch
+            output_file: Path to save the output file
+            population_type: Population type (default: "UR")
+            max_poll_attempts: Maximum number of attempts to poll for filter completion
+            poll_interval: Time in seconds between poll attempts
+
+        Returns:
+            Path to the downloaded file or None if failed
+        """
+        import time
+
+        try:
+            # Create filter
+            filter_response = filter_client.create_filter(
+                dataset_id=dataset_id,
+                population_type=population_type,
+                geo_level=geo_level,
+                area_codes=area_codes
+            )
+            filter_id = filter_response["filter_id"]
+            logger.info(f"Created filter with ID: {filter_id}")
+
+            # Submit filter for processing
+            submit_response = filter_client.submit_filter(filter_id)
+            filter_output_id = submit_response["filter_output_id"]
+            logger.info(f"Filter submitted, output ID: {filter_output_id}")
+
+            # Poll for filter completion and get download URLs
+            for attempt in range(max_poll_attempts):
+                logger.info(f"Checking filter status (attempt {attempt+1}/{max_poll_attempts})")
+                filter_output = filter_client.get_filter_output(filter_output_id)
+
+                # Check if CSV download is available
+                downloads = filter_output.get("downloads", {})
+                csv_info = downloads.get("csv", {})
+                csv_url = csv_info.get("href") if csv_info else None
+
+                if csv_url:
+                    logger.info("CSV download available, proceeding with download")
+                    filter_client.download_filter_output(csv_url, output_file)
+                    logger.info(f"Downloaded data to {output_file}")
+
+                    # Save dimension information in a debug file for later processing
+                    debug_file = f"{output_file}.debug.json"
+                    debug_data = {
+                        "dataset_id": dataset_id,
+                        "geo_level": geo_level,
+                        "population_type": population_type,
+                        "dimensions": filter_output.get("dimensions", []),
+                        "_area_metadata": {
+                            "geo_level": geo_level,
+                            "area_codes": area_codes
+                        }
+                    }
+
+                    # Fetch a small sample of the data to get dimension information
+                    # This is needed because the filter API doesn't include dimension breakdown
+                    try:
+                        if dataset_id.startswith("TS"):
+                            from ..api.ts_client import TSApiClient
+                            sample_client = TSApiClient(self.base_url)
+                            # Get sample for first 5 areas or fewer
+                            sample_areas = area_codes[:5]
+                            sample_response = sample_client.get_dataset_data_for_areas(
+                                dataset_id, geo_level, sample_areas, population_type
+                            )
+                            if sample_response:
+                                # Add dimensions from sample response
+                                debug_data["dimensions"] = sample_response.get("dimensions", [])
+                                debug_data["sample_response"] = True
+                        elif dataset_id.startswith("RM"):
+                            from ..api.rm_client import RMApiClient
+                            sample_client = RMApiClient(self.base_url)
+                            # Get sample for first 5 areas or fewer
+                            sample_areas = area_codes[:5]
+                            sample_response = sample_client.get_dataset_data_for_areas(
+                                dataset_id, geo_level, sample_areas, population_type
+                            )
+                            if sample_response:
+                                # Add dimensions from sample response
+                                debug_data["dimensions"] = sample_response.get("dimensions", [])
+                                debug_data["sample_response"] = True
+                    except Exception as e:
+                        logger.warning(f"Failed to get dimension sample: {str(e)}")
+
+                    # Save the debug information
+                    import json
+                    with open(debug_file, "w", encoding="utf-8") as f:
+                        json.dump(debug_data, f, indent=2)
+
+                    return output_file
+
+                # If not ready, wait and try again
+                logger.info(f"Filter still processing, waiting {poll_interval} seconds")
+                time.sleep(poll_interval)
+
+            logger.error("Filter did not complete within the expected time")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error using filter API: {str(e)}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return None
 
     def _make_request(
         self, endpoint: str, params: Dict = None, max_retries: int = 3

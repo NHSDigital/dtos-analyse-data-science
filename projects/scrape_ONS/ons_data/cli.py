@@ -8,6 +8,7 @@ import logging
 import sys
 import os
 import time
+import json
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
@@ -123,6 +124,12 @@ def setup_parser():
         help="Population type for census data (default: UR)",
     )
 
+    parser.add_argument(
+        "--use-filter",
+        action="store_true",
+        help="Use ONS Filter API for data retrieval (recommended for large datasets)"
+    )
+
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
     return parser
@@ -202,6 +209,7 @@ def create_config(args) -> ONSConfig:
         population_type=args.population_type,
         output_dir=output_dir,
         batch_sizes=batch_sizes,
+        use_filter=args.use_filter,
     )
 
 
@@ -222,6 +230,7 @@ def download_data_for_level(
     output_dir: str,
     batch_size: int,
     population_type: str = "UR",
+    use_filter: bool = False,
 ) -> Optional[str]:
     """
     Download data for a specific geographic level.
@@ -232,6 +241,7 @@ def download_data_for_level(
         output_dir: Output directory
         batch_size: Batch size for processing
         population_type: Population type
+        use_filter: Whether to use the filter API instead of batch download
 
     Returns:
         str: Path to the output file or None if failed
@@ -286,68 +296,118 @@ def download_data_for_level(
             os.remove(old_flat_file)
             logger.debug(f"Removed old flattened file: {old_flat_file}")
 
-        # Get all areas for this geographic level
-        logger.info(f"Fetching areas for level {geo_level}")
-        areas = api_client.get_areas_for_level(geo_level, population_type)
-        if not areas:
-            logger.warning(f"No areas found for level {geo_level}")
-            return None
+        # Large geographic levels that are better processed using filter API
+        large_geo_levels = ["lsoa", "msoa", "oa"]
 
-        logger.info(f"Found {len(areas)} areas for level {geo_level}")
+        # Decide whether to use filter API
+        should_use_filter = use_filter or (geo_level in large_geo_levels)
 
-        # Extract area codes
-        area_codes = [area["id"] for area in areas]
+        if should_use_filter:
+            logger.info(f"Using filter API for level {geo_level} (large dataset)")
 
-        # Get dataset data in batches
-        if dataset_id.startswith("TS"):
-            response = api_client.batch_get_dataset_data(
+            # Use the filter API directly
+            filtered_file = api_client.get_dataset_using_filter(
                 dataset_id=dataset_id,
-                area_codes=area_codes,
                 geo_level=geo_level,
-                batch_size=batch_size,
-                population_type=population_type,
-            )
-        else:  # RM dataset
-            response = api_client.batch_get_dataset_data(
-                dataset_id=dataset_id,
-                area_codes=area_codes,
-                geo_level=geo_level,
-                batch_size=batch_size,
-                population_type=population_type,
+                output_dir=output_dir,
+                population_type=population_type
             )
 
-        # Process the response: First save to temp file
-        temp_result = processor.process_response(response, temp_file)
+            if not filtered_file:
+                logger.error(f"Failed to retrieve data using filter API for level {geo_level}")
+                return None
 
-        if not temp_result:
-            logger.error(f"Failed to process data for level {geo_level}")
-            return None
+            # Also create a debug.json file for consistency
+            debug_file = f"{output_file}.debug.json"
+            try:
+                # Get minimal metadata for debug file
+                areas = api_client.get_areas_for_level(geo_level, population_type)
+                sample_area_codes = [area["id"] for area in areas[:5]]  # Just get a few areas
 
-        # Then directly flatten it to the final output file
-        flat_result = processor.flatten_data(temp_file, output_file)
+                sample_data = api_client.get_dataset_data(
+                    dataset_id=dataset_id,
+                    area_codes=sample_area_codes,
+                    geo_level=geo_level,
+                    population_type=population_type
+                )
 
-        # Remove the temporary file
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
-            logger.debug(f"Removed temporary file {temp_file}")
+                # Save minimal debug info
+                with open(debug_file, "w") as f:
+                    json.dump(sample_data, f, indent=2)
+                logger.debug(f"Created debug file with sample metadata: {debug_file}")
+            except Exception as e:
+                logger.warning(f"Failed to create debug file, but data was retrieved: {str(e)}")
 
-        # Also remove the debug JSON if it exists
-        debug_file = f"{temp_file}.debug.json"
-        if os.path.exists(debug_file):
-            # We need to keep the debug file for the flattening to work correctly
-            # Just rename it to be associated with the output file
-            new_debug_file = f"{output_file}.debug.json"
-            os.rename(debug_file, new_debug_file)
-            logger.debug(f"Renamed debug file to {new_debug_file}")
-
-        if flat_result:
-            logger.info(
-                f"Successfully processed and flattened data for level {geo_level}"
-            )
-            return output_file
+            logger.info(f"Successfully retrieved data for level {geo_level} using filter API")
+            return filtered_file
         else:
-            logger.error(f"Failed to flatten data for level {geo_level}")
-            return None
+            # Use the original batch processing method for smaller datasets
+            # Get all areas for this geographic level
+            logger.info(f"Using batch processing for level {geo_level}")
+            logger.info(f"Fetching areas for level {geo_level}")
+            areas = api_client.get_areas_for_level(geo_level, population_type)
+            if not areas:
+                logger.warning(f"No areas found for level {geo_level}")
+                return None
+
+            logger.info(f"Found {len(areas)} areas for level {geo_level}")
+
+            # Extract area codes
+            area_codes = [area["id"] for area in areas]
+
+            # Get dataset data in batches
+            if dataset_id.startswith("TS"):
+                response = api_client.batch_get_dataset_data(
+                    dataset_id=dataset_id,
+                    area_codes=area_codes,
+                    geo_level=geo_level,
+                    batch_size=batch_size,
+                    population_type=population_type,
+                )
+            else:  # RM dataset
+                response = api_client.batch_get_dataset_data(
+                    dataset_id=dataset_id,
+                    area_codes=area_codes,
+                    geo_level=geo_level,
+                    batch_size=batch_size,
+                    population_type=population_type,
+                )
+
+            # Process the response: First save to temp file
+            temp_result = processor.process_response(response, temp_file,
+                                                  area_metadata={"area_codes": area_codes})
+
+            if not temp_result:
+                logger.error(f"Failed to process data for level {geo_level}")
+                return None
+
+            # Then directly flatten it to the final output file with area metadata
+            flat_result = processor.flatten_data(temp_file, output_file,
+                                               area_metadata={"area_codes": area_codes,
+                                                            "geo_level": geo_level})
+
+            # Remove the temporary file
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+                logger.debug(f"Removed temporary file {temp_file}")
+
+            # Also remove the debug JSON if it exists
+            debug_file = f"{temp_file}.debug.json"
+            if os.path.exists(debug_file):
+                # We need to keep the debug file for the flattening to work correctly
+                # Just rename it to be associated with the output file
+                new_debug_file = f"{output_file}.debug.json"
+                os.rename(debug_file, new_debug_file)
+                logger.debug(f"Renamed debug file to {new_debug_file}")
+
+            if flat_result:
+                logger.info(
+                    f"Successfully processed and flattened data for level {geo_level}"
+                )
+                return output_file
+            else:
+                logger.error(f"Failed to flatten data for level {geo_level}")
+                return None
 
     except Exception as e:
         logger.error(f"Error processing level {geo_level}: {str(e)}")
@@ -655,6 +715,7 @@ def main():
                 output_dir=config.output_dir,
                 batch_size=batch_size,
                 population_type=config.population_type,
+                use_filter=config.use_filter,
             )
 
             if output_file:
@@ -748,6 +809,7 @@ def process_dataset(
     batch_size: int = None,
     population_type: str = "UR",
     debug: bool = False,
+    use_filter: bool = False,
     **kwargs,
 ) -> Optional[str]:
     """
@@ -761,6 +823,7 @@ def process_dataset(
         batch_size: Batch size for processing
         population_type: Population type
         debug: Enable debug mode
+        use_filter: Whether to use the filter API instead of batch download
         **kwargs: Additional arguments
 
     Returns:
@@ -794,6 +857,7 @@ def process_dataset(
         output_dir=nested_output_dir,
         batch_size=batch_size,
         population_type=population_type,
+        use_filter=use_filter,
     )
 
     # The e2e tests expect a different naming convention

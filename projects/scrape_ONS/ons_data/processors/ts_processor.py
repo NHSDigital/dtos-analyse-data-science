@@ -22,13 +22,14 @@ class TSProcessor(BaseProcessor):
     - Requires reconstructing dimension combinations
     """
 
-    def process_response(self, response: Dict[str, Any], output_file: str) -> str:
+    def process_response(self, response: Dict[str, Any], output_file: str, area_metadata: Dict[str, Any] = None) -> str:
         """
         Process TS dataset response and save to CSV.
 
         Args:
             response: Raw API response data
             output_file: Path to save the processed data
+            area_metadata: Additional metadata about areas (optional)
 
         Returns:
             str: Path to the saved file
@@ -36,6 +37,11 @@ class TSProcessor(BaseProcessor):
         try:
             # Save debug info for potential later use
             debug_file = f"{output_file}.debug.json"
+
+            # If we have area metadata, add it to the debug info
+            if area_metadata:
+                response["_area_metadata"] = area_metadata
+
             with open(debug_file, "w") as f:
                 json.dump(response, f, indent=2)
 
@@ -72,7 +78,7 @@ class TSProcessor(BaseProcessor):
             logger.error(traceback.format_exc())
             return ""
 
-    def flatten_data(self, input_file: str, output_file: Optional[str] = None) -> str:
+    def flatten_data(self, input_file: str, output_file: Optional[str] = None, area_metadata: Dict[str, Any] = None) -> str:
         """
         Flatten TS dataset by reconstructing dimension combinations.
 
@@ -84,6 +90,7 @@ class TSProcessor(BaseProcessor):
         Args:
             input_file: Path to the raw data CSV
             output_file: Path to save the flattened data (optional)
+            area_metadata: Additional metadata about areas (optional)
 
         Returns:
             str: Path to the flattened data file
@@ -113,6 +120,14 @@ class TSProcessor(BaseProcessor):
                         metadata = json.load(f)
                     logger.info(f"Found debug file with metadata: {debug_file}")
                     logger.debug(f"Metadata keys: {list(metadata.keys())}")
+
+                    # Merge any additional area metadata if provided
+                    if area_metadata and "_area_metadata" not in metadata:
+                        metadata["_area_metadata"] = area_metadata
+
+                    # If we already have area metadata in the debug file, use that
+                    if "_area_metadata" not in metadata and area_metadata:
+                        metadata["_area_metadata"] = area_metadata
 
                     # Inspect metadata structure
                     if "dimensions" in metadata:
@@ -290,6 +305,114 @@ class TSProcessor(BaseProcessor):
         total_combinations = 1
         for count in dim_counts:
             total_combinations *= count
+
+        # Check if we have more observations than combinations
+        # This happens when we have metadata for only a subset of the areas
+        if len(values) > total_combinations:
+            logger.warning(f"More observations ({len(values)}) than dimension combinations ({total_combinations})")
+            logger.info("Attempting to reconstruct complete dimension data")
+
+            # Get area metadata if available
+            area_metadata = metadata.get("_area_metadata", {})
+            area_codes = area_metadata.get("area_codes", [])
+            geo_level = area_metadata.get("geo_level", "")
+
+            # For census datasets, the first dimension is usually geographic area
+            # and the second dimension is the category (like religion)
+            if len(dimensions) == 2:
+                # Assume standard Census structure (area dim and category dim)
+                geo_dim = dimensions[0]  # First dimension (geographic)
+                cat_dim = dimensions[1]  # Second dimension (category)
+
+                # Get the number of categories from existing metadata
+                cat_options = dimension_values.get(cat_dim, [])
+                num_categories = len(cat_options)
+
+                if num_categories > 0:
+                    # Calculate how many geographic areas we should have
+                    num_areas = len(values) // num_categories
+
+                    logger.info(f"Reconstructing data for {num_areas} areas with {num_categories} categories each")
+
+                    # Check if we have area codes in the metadata
+                    has_area_codes = len(area_codes) > 0
+                    if has_area_codes:
+                        logger.info(f"Using {len(area_codes)} area codes from metadata")
+                        if len(area_codes) < num_areas:
+                            logger.warning(f"Not enough area codes in metadata ({len(area_codes)}), needed {num_areas}")
+
+                    # Generate flat rows with area IDs
+                    flat_rows = []
+                    for area_idx in range(num_areas):
+                        for cat_idx in range(num_categories):
+                            # Calculate the observation index
+                            obs_index = area_idx * num_categories + cat_idx
+                            if obs_index < len(values):
+                                # Get category data from existing metadata
+                                cat_option = cat_options[cat_idx] if cat_idx < len(cat_options) else {}
+
+                                # Create row with area ID
+                                row = {}
+
+                                # Add geographic dimension with actual area code if available
+                                if has_area_codes and area_idx < len(area_codes):
+                                    # Use actual area code from metadata
+                                    area_code = area_codes[area_idx]
+                                    row[geo_dim] = f"Area {area_idx+1}"  # We don't have area names
+                                    row[f"{geo_dim}_code"] = area_code
+                                else:
+                                    # Use reconstructed area ID
+                                    row[geo_dim] = f"Area {area_idx+1}"
+                                    row[f"{geo_dim}_code"] = f"AREA{area_idx+1:06d}"
+
+                                # Add category dimension from existing metadata
+                                if isinstance(cat_option, dict):
+                                    # Try different key names for labels and IDs
+                                    for label_key in ["label", "name", "value"]:
+                                        if label_key in cat_option:
+                                            row[cat_dim] = cat_option[label_key]
+                                            break
+                                    for id_key in ["id", "code"]:
+                                        if id_key in cat_option:
+                                            row[f"{cat_dim}_code"] = cat_option[id_key]
+                                            break
+                                else:
+                                    # If option is just a string
+                                    row[cat_dim] = str(cat_option)
+                                    row[f"{cat_dim}_code"] = str(cat_option)
+
+                                # Add observation value
+                                row["observation"] = values[obs_index]
+                                flat_rows.append(row)
+
+                    logger.info(f"Created {len(flat_rows)} reconstructed rows")
+                    return flat_rows, fieldnames
+
+            # If we can't reconstruct with categories but have area codes, create area-based rows
+            if area_codes:
+                logger.info(f"Creating area-based rows with {len(area_codes)} areas")
+                flat_rows = []
+                values_per_area = len(values) // len(area_codes)
+                for area_idx, area_code in enumerate(area_codes):
+                    for value_idx in range(values_per_area):
+                        obs_index = area_idx * values_per_area + value_idx
+                        if obs_index < len(values):
+                            row = {
+                                geo_level: f"Area {area_idx+1}",
+                                f"{geo_level}_code": area_code,
+                                "value_index": value_idx,
+                                "observation": values[obs_index]
+                            }
+                            flat_rows.append(row)
+                return flat_rows, [geo_level, f"{geo_level}_code", "value_index", "observation"]
+
+            # If we can't reconstruct, just create simple rows with values
+            logger.info("Using simple method for large dataset")
+            flat_rows = []
+            for i, value in enumerate(values):
+                row = {"observation": value, "row_index": i}
+                flat_rows.append(row)
+            return flat_rows, ["row_index", "observation"]
 
         logger.info(
             f"Total combinations: {total_combinations}, Observations: {len(values)}"

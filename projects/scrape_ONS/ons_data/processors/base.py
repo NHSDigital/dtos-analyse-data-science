@@ -17,13 +17,14 @@ class BaseProcessor(ABC):
     """
 
     @abstractmethod
-    def process_response(self, response: Dict[str, Any], output_file: str) -> str:
+    def process_response(self, response: Dict[str, Any], output_file: str, area_metadata: Dict[str, Any] = None) -> str:
         """
         Process API response data and save it to a file.
 
         Args:
             response: Raw API response data
             output_file: Path to save the processed data
+            area_metadata: Additional metadata about areas (optional)
 
         Returns:
             str: Path to the saved file
@@ -31,13 +32,14 @@ class BaseProcessor(ABC):
         pass
 
     @abstractmethod
-    def flatten_data(self, input_file: str, output_file: Optional[str] = None) -> str:
+    def flatten_data(self, input_file: str, output_file: Optional[str] = None, area_metadata: Dict[str, Any] = None) -> str:
         """
         Flatten a dataset from its raw form into a standardized tabular format.
 
         Args:
             input_file: Path to the input file with raw data
             output_file: Path to save the flattened data (optional)
+            area_metadata: Additional metadata about areas (optional)
 
         Returns:
             str: Path to the flattened file

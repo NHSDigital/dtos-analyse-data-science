@@ -74,6 +74,7 @@ class ONSConfig(BaseModel):
     population_type: str = "UR"
     output_dir: str = "data"
     batch_sizes: BatchSizeConfig = Field(default_factory=BatchSizeConfig)
+    use_filter: bool = False
 
 
 class DatasetAvailability(BaseModel):

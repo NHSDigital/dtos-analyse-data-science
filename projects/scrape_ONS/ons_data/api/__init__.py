@@ -4,6 +4,7 @@ import logging
 from .client import ONSApiClient
 from .ts_client import TSApiClient
 from .rm_client import RMApiClient
+from .filter_client import ONSFilterClient
 from ..models.common import DatasetType
 
 logger = logging.getLogger(__name__)
@@ -47,3 +48,13 @@ class ApiClientFactory:
             logger.error(f"Unknown dataset type prefix: {dataset_type_prefix}")
 
         return None
+
+    @staticmethod
+    def get_filter_client():
+        """
+        Get the ONS Filter API client.
+
+        Returns:
+            An instance of ONSFilterClient
+        """
+        return ONSFilterClient()
