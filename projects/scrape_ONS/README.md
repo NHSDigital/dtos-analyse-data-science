@@ -28,7 +28,7 @@ Key features:
 
 ### Setup
 
-1. Install the requirments using poetry
+1. Install the requirements using poetry
 
 ```bash
 poetry install
