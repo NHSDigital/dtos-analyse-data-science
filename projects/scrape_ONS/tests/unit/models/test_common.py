@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 # Import the actual models used in the implementation
-from ons_data.models.common import (
+from ons_client.models.common import (
     DatasetType,
     GeoLevel,
     Dimension,

@@ -83,7 +83,7 @@ class TestE2E:
         """Test importing the package and running it programmatically"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Import the necessary components
-            from ons_data.cli import process_dataset
+            from ons_client.cli import process_dataset
 
             # Process a small dataset
             dataset_id = "TS008"  # Sex by geographic area
@@ -118,7 +118,7 @@ class TestE2E:
         # Skip this test if --runslow is not specified
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            from ons_data.cli import process_dataset
+            from ons_client.cli import process_dataset
 
             # Process a small dataset at region level
             dataset_id = "TS008"  # Sex by geographic area
@@ -159,7 +159,7 @@ class TestE2E:
         # This test is focused on ensuring RM datasets can be processed correctly
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            from ons_data.cli import process_dataset
+            from ons_client.cli import process_dataset
 
             # Process a small RM dataset
             dataset_id = "RM001"  # A simple RM dataset (adjust based on what's available)
@@ -197,7 +197,7 @@ class TestE2E:
     def test_cache_directory(self, check_internet_connection):
         """Test that debug files are created when debug mode is enabled"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            from ons_data.cli import process_dataset
+            from ons_client.cli import process_dataset
 
             # Process with debug enabled
             dataset_id = "TS008"

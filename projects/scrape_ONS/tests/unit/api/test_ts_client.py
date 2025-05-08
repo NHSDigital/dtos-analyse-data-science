@@ -1,8 +1,9 @@
 import pytest
 from unittest.mock import patch, Mock, call
+import requests
 
 # Import the TS client
-from ons_data.api.ts_client import TSApiClient
+from ons_client.api.ts_client import TSApiClient
 
 class TestTSApiClient:
 

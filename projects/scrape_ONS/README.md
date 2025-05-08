@@ -4,7 +4,7 @@ A Python tool for retrieving, processing, and flattening census data from the UK
 
 ## Overview
 
-This tool provides a clean, efficient way to download and process Census 2021 data from the ONS API. It supports both Time Series (TS) and Regular Matrix (RM) datasets, handling the specific requirements of each format while providing a consistent output structure.
+This tool provides a clean, efficient way to download and process Census 2021 data from the ONS API. It supports both Topic Summary (TS) and Regular Matrix (RM) datasets, handling the specific requirements of each format while providing a consistent output structure.
 
 Key features:
 
@@ -60,7 +60,7 @@ poetry run python run_census.py --list-datasets
 
 ### Examples
 
-Download a Time Series dataset for all countries:
+Download a Topic Summary dataset for all countries:
 
 ```bash
 poetry run python run_census.py --dataset TS030 --geo-level ctry
@@ -190,7 +190,7 @@ Each row represents a unique combination of dimensions with the corresponding ob
 ## Project Structure
 
 ``` plaintext
-ons_data/
+ons_client/
 ├── __init__.py          # Package initialization
 ├── api/                 # API client components
 │   ├── __init__.py
@@ -242,7 +242,7 @@ poetry run python -m pytest tests/unit/models/
 poetry run python -m pytest tests/unit/processors/
 
 # Run with coverage report
-poetry run python -m pytest tests/ --cov=ons_data
+poetry run python -m pytest tests/ --cov=ons_client
 ```
 
 ### Test Coverage

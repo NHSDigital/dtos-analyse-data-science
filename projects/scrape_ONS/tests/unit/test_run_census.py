@@ -43,7 +43,7 @@ class TestRunCensus:
             sys.path.remove(run_census_dir)
 
         # Import run_census
-        with patch('ons_data.cli.main'):
+        with patch('ons_client.cli.main'):
             # Use direct import instead of importlib to simplify path handling
             run_census_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
                         "run_census.py")
@@ -59,8 +59,8 @@ class TestRunCensus:
         sys.path = original_path
 
     def test_main_function_called(self):
-        """Test that the main function from ons_data.cli is called when script is run directly"""
-        with patch('ons_data.cli.main') as mock_main:
+        """Test that the main function from ons_client.cli is called when script is run directly"""
+        with patch('ons_client.cli.main') as mock_main:
             # Get path to run_census.py
             run_census_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
                         "run_census.py")
@@ -72,7 +72,7 @@ class TestRunCensus:
             }
 
             # Execute only the last part of the script - the if block
-            code = "from ons_data.cli import main\nif __name__ == '__main__':\n    main()"
+            code = "from ons_client.cli import main\nif __name__ == '__main__':\n    main()"
             exec(code, test_globals)
 
             # Verify main was called

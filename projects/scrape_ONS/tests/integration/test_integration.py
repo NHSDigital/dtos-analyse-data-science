@@ -3,14 +3,14 @@ import os
 import tempfile
 from unittest.mock import patch, MagicMock, Mock
 
-from ons_data.api.client import ONSApiClient
-from ons_data.api.ts_client import TSApiClient
-from ons_data.api.rm_client import RMApiClient
-from ons_data.processors.ts_processor import TSProcessor
-from ons_data.processors.rm_processor import RMProcessor
-from ons_data.cli import download_data_for_level  # Changed to use the function that actually exists
-from ons_data.api import ApiClientFactory
-from ons_data.processors import ProcessorFactory
+from ons_client.api.client import ONSApiClient
+from ons_client.api.ts_client import TSApiClient
+from ons_client.api.rm_client import RMApiClient
+from ons_client.processors.ts_processor import TSProcessor
+from ons_client.processors.rm_processor import RMProcessor
+from ons_client.cli import download_data_for_level  # Changed to use the function that actually exists
+from ons_client.api import ApiClientFactory
+from ons_client.processors import ProcessorFactory
 
 class TestDataIntegration:
 

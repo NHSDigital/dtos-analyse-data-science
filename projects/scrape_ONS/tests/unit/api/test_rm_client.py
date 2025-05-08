@@ -1,8 +1,9 @@
 import pytest
 from unittest.mock import patch, Mock, call
+import requests
 
 # Import the RM client
-from ons_data.api.rm_client import RMApiClient
+from ons_client.api.rm_client import RMApiClient
 
 class TestRMApiClient:
 

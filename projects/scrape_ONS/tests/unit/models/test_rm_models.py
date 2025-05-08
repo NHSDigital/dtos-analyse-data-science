@@ -1,9 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
-# Import the RM models - adjust path as needed
-from ons_data.models.rm_models import RMResponse, RMObservation, RMDimension
-from ons_data.models.common import Dimension, DimensionOption
+# Import the models under test
+from ons_client.models.rm_models import RMResponse, RMObservation, RMDimension
+from ons_client.models.common import Dimension, DimensionOption
 
 class TestRMModels:
 

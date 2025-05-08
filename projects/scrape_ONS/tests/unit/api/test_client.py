@@ -6,8 +6,8 @@ import tempfile
 import os
 import json
 
-# Import the actual API client
-from ons_data.api.client import ONSApiClient, with_retry
+# Import module under test
+from ons_client.api.client import ONSApiClient, with_retry
 
 class TestONSApiClient:
 

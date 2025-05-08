@@ -5,14 +5,15 @@ import tempfile
 from unittest.mock import patch, MagicMock, Mock
 
 # Import the CLI module
-from ons_data.cli import (
+from ons_client.cli import (
     setup_parser,
     validate_args,
     create_config,
     ensure_output_dir,
+    download_data_for_level,
     main,
 )
-from ons_data.models.common import ONSConfig, BatchSizeConfig
+from ons_client.models.common import ONSConfig, BatchSizeConfig
 
 
 class TestCLI:
@@ -136,12 +137,12 @@ class TestCLI:
             # Running again should not cause errors
             ensure_output_dir(test_dir)
 
-    @patch("ons_data.cli.setup_parser")
-    @patch("ons_data.cli.validate_args")
-    @patch("ons_data.cli.create_config")
-    @patch("ons_data.cli.ensure_output_dir")
-    @patch("ons_data.cli.download_data_for_level")
-    @patch("ons_data.cli.configure_logging")
+    @patch("ons_client.cli.setup_parser")
+    @patch("ons_client.cli.validate_args")
+    @patch("ons_client.cli.create_config")
+    @patch("ons_client.cli.ensure_output_dir")
+    @patch("ons_client.cli.download_data_for_level")
+    @patch("ons_client.cli.configure_logging")
     def test_main_function(
         self,
         mock_configure_logging,
@@ -188,15 +189,15 @@ class TestCLI:
             population_type="UR",
         )
 
-    @patch("ons_data.cli.validate_args")
+    @patch("ons_client.cli.validate_args")
     def test_main_validation_failure(self, mock_validate_args):
         """Test main function when validation fails"""
         # Mock validation to fail
         mock_validate_args.return_value = False
 
         # Call main and expect SystemExit
-        with patch("ons_data.cli.setup_parser"):
-            with patch("ons_data.cli.configure_logging"):
+        with patch("ons_client.cli.setup_parser"):
+            with patch("ons_client.cli.configure_logging"):
                 with pytest.raises(SystemExit) as excinfo:
                     main()
 

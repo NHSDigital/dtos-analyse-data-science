@@ -1,9 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
-# Import the TS models - adjust path as needed
-from ons_data.models.ts_models import TSResponse, TSObservation, TSFlattenedRow
-from ons_data.models.common import Dimension, DimensionOption
+# Import the models under test
+from ons_client.models.ts_models import TSResponse, TSObservation, TSFlattenedRow
+from ons_client.models.common import Dimension, DimensionOption
 
 class TestTSModels:
 

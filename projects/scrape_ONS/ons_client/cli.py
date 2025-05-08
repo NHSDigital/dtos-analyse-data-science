@@ -60,7 +60,7 @@ def configure_logging(debug_mode=False):
 
 
 # Get module-level logger
-logger = logging.getLogger("ons_data")
+logger = logging.getLogger("ons_client")
 
 
 def setup_parser():
@@ -80,7 +80,7 @@ def setup_parser():
     main_group.add_argument(
         "--dataset",
         type=str,
-        help="Dataset ID to retrieve (e.g., TS030 for Time Series, RM097 for Regular Matrix)",
+        help="Dataset ID to retrieve (e.g., TS030 for Topic Summary, RM097 for Regular Matrix)",
     )
 
     main_group.add_argument(
@@ -446,7 +446,7 @@ def list_datasets():
         # First, provide information about Census datasets
         print("### CENSUS 2021 DATASETS ###")
         print("Census datasets typically use the following prefixes:")
-        print("- TS: Time Series datasets (e.g., TS030 for Religion)")
+        print("- TS: Topic Summary datasets (e.g., TS030 for Religion)")
         print("- RM: Regular Matrix datasets (e.g., RM097 for Occupancy Rating)")
         print()
         print("Common Census 2021 datasets include:")
@@ -488,14 +488,14 @@ def list_datasets():
         print("### AVAILABLE DATASETS FROM API ###")
 
         if ts_datasets:
-            print(f"\n--- TIME SERIES DATASETS ({len(ts_datasets)}) ---")
+            print(f"\n--- TOPIC SUMMARY DATASETS ({len(ts_datasets)}) ---")
             for ds in ts_datasets:
                 print(f"{ds.id}: {ds.title}")
                 if ds.description:
                     print(f"   {ds.description}")
         else:
-            print("\n--- TIME SERIES DATASETS ---")
-            print("No Time Series datasets found in the general API endpoint.")
+            print("\n--- TOPIC SUMMARY DATASETS ---")
+            print("No Topic Summary datasets found in the general API endpoint.")
 
         if rm_datasets:
             print(f"\n--- REGULAR MATRIX DATASETS ({len(rm_datasets)}) ---")
@@ -632,7 +632,7 @@ def print_datasets():
         # Display all dataset types
         while True:
             print("\n=== DATASET TYPES ===")
-            print(f"[1] TIME SERIES (TS) DATASETS ({len(ts_datasets)})")
+            print(f"[1] TOPIC SUMMARY (TS) DATASETS ({len(ts_datasets)})")
             print(f"[2] REGULAR MATRIX (RM) DATASETS ({len(rm_datasets)})")
             print(f"[3] OTHER DATASETS ({len(other_datasets)})")
             print("[4] SUMMARY ONLY")
@@ -641,7 +641,7 @@ def print_datasets():
             choice = input("\nEnter choice (1-4 or q): ").strip().lower()
 
             if choice == "1":
-                result = display_datasets(ts_datasets, "TIME SERIES (TS)")
+                result = display_datasets(ts_datasets, "TOPIC SUMMARY (TS)")
                 if result == "quit":
                     break
             elif choice == "2":
@@ -663,7 +663,7 @@ def print_datasets():
         # Print summary
         print(f"\n=== SUMMARY ===")
         print(f"Total: {len(datasets)} datasets")
-        print(f"- {len(ts_datasets)} Time Series (TS) datasets")
+        print(f"- {len(ts_datasets)} Topic Summary (TS) datasets")
         print(f"- {len(rm_datasets)} Regular Matrix (RM) datasets")
         print(f"- {len(other_datasets)} Other datasets")
         print("\nNOTE: Common Census datasets are included in this list.")

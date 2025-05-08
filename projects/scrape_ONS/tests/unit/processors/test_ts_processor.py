@@ -5,10 +5,10 @@ import tempfile
 import json
 from unittest.mock import patch, Mock, MagicMock, mock_open
 
-# Import the TS processor
-from ons_data.processors.ts_processor import TSProcessor
-from ons_data.models.ts_models import TSResponse, TSObservation, TSFlattenedRow
-from ons_data.models.common import Dimension, DimensionOption
+# Import the processor under test
+from ons_client.processors.ts_processor import TSProcessor
+from ons_client.models.ts_models import TSResponse, TSObservation, TSFlattenedRow
+from ons_client.models.common import Dimension, DimensionOption
 
 class TestTSProcessor:
 

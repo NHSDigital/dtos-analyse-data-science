@@ -5,10 +5,10 @@ import tempfile
 import json
 from unittest.mock import patch, Mock, MagicMock, mock_open
 
-# Import the RM processor
-from ons_data.processors.rm_processor import RMProcessor
-from ons_data.models.rm_models import RMResponse, RMObservation, RMDimension
-from ons_data.models.common import Dimension, DimensionOption
+# Import the processor under test
+from ons_client.processors.rm_processor import RMProcessor
+from ons_client.models.rm_models import RMResponse, RMObservation, RMDimension
+from ons_client.models.common import Dimension, DimensionOption
 
 class TestRMProcessor:
 
