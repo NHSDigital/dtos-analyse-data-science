@@ -4,7 +4,7 @@ from .common import Dataset, Dimension, DimensionWithOptions
 
 
 class TSDataset(Dataset):
-    """Time Series dataset model"""
+    """Topic Summary dataset model"""
     dimensions: List[DimensionWithOptions] = []
     observations: List[str] = []
 

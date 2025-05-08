@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class TSApiClient(ONSApiClient):
     """
-    Client for interacting with Time Series (TS) datasets in the ONS API.
+    Client for interacting with Topic Summary (TS) datasets in the ONS API.
 
     Handles TS-specific API calls and data formatting.
     """
@@ -29,7 +29,7 @@ class TSApiClient(ONSApiClient):
         Retrieve data for a TS dataset for specific areas.
 
         Args:
-            dataset_id: The Time Series dataset ID
+            dataset_id: The Topic Summary dataset ID
             area_codes: List of area codes to retrieve data for
             geo_level: Geographic level (default: "ctry")
             population_type: The population type (default: "UR")
@@ -77,7 +77,7 @@ class TSApiClient(ONSApiClient):
         Retrieve data for a TS dataset in batches to avoid URL length limitations.
 
         Args:
-            dataset_id: The Time Series dataset ID
+            dataset_id: The Topic Summary dataset ID
             area_codes: List of area codes to retrieve data for
             geo_level: Geographic level (default: "ctry")
             batch_size: Maximum number of areas per request

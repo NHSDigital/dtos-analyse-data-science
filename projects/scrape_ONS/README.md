@@ -120,7 +120,7 @@ The tool primarily uses the following ONS API endpoints as documented in the [ON
    - `GET /population-types/{population-type}/census-observations` - Retrieves observation data
 
 4. **Dataset Observations (for TS datasets)**:
-   - `GET /datasets/{datasetId}/editions/{edition}/versions/{version}/json` - Retrieves time series data
+   - `GET /datasets/{datasetId}/editions/{edition}/versions/{version}/json` - Retrieves topic summary data
 
 ### Rate Limiting
 
@@ -140,9 +140,9 @@ According to ONS Developer Hub, the following rate limits are applied:
 
 The tool supports two types of ONS datasets:
 
-### Time Series (TS) Datasets
+### Topic Summary (TS) Datasets
 
-Time Series datasets (prefixed with `TS`) represent simpler data structures focused on a single variable across different dimensions. These are accessed using the `/datasets/{datasetId}/editions/{edition}/versions/{version}/json` endpoint.
+Topic Summary datasets (prefixed with `TS`) represent simpler data structures focused on a single variable across different dimensions. These are accessed using the `/datasets/{datasetId}/editions/{edition}/versions/{version}/json` endpoint.
 
 Examples include:
 
@@ -195,17 +195,17 @@ ons_data/
 ├── api/                 # API client components
 │   ├── __init__.py
 │   ├── client.py        # Base API client
-│   ├── ts_client.py     # Time Series client
+│   ├── ts_client.py     # Topic Summary client
 │   └── rm_client.py     # Regular Matrix client
 ├── models/              # Pydantic data models
 │   ├── __init__.py
 │   ├── common.py        # Shared models
-│   ├── ts_models.py     # Time Series models
+│   ├── ts_models.py     # Topic Summary models
 │   └── rm_models.py     # Regular Matrix models
 ├── processors/          # Data processors
 │   ├── __init__.py
 │   ├── base.py          # Base processor
-│   ├── ts_processor.py  # Time Series processor
+│   ├── ts_processor.py  # Topic Summary processor
 │   └── rm_processor.py  # Regular Matrix processor
 └── cli.py               # Command-line interface
 ```

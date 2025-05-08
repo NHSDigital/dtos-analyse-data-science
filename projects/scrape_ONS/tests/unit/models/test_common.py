@@ -94,7 +94,7 @@ class TestCommonModels:
         assert ts_dataset.id == "TS030"
         assert ts_dataset.title == "Religion by geographic area"
         assert ts_dataset.description == "Census 2021 time series data on religion"
-        assert ts_dataset.dataset_type == DatasetType.TIME_SERIES
+        assert ts_dataset.dataset_type == DatasetType.TOPIC_SUMMARY
 
         # Create RM dataset
         rm_dataset = Dataset(
@@ -105,10 +105,9 @@ class TestCommonModels:
 
         assert rm_dataset.dataset_type == DatasetType.REGULAR_MATRIX
 
-        # Test invalid dataset ID
-        invalid_dataset = Dataset(id="XX123", title="Invalid dataset")
-        with pytest.raises(ValueError):
-            _ = invalid_dataset.dataset_type
+        # Test dataset with other ID prefix
+        other_dataset = Dataset(id="XX123", title="Other dataset")
+        assert other_dataset.dataset_type == DatasetType.OTHER
 
     def test_batch_size_config(self):
         """Test BatchSizeConfig model"""

@@ -36,7 +36,7 @@ class ProcessorFactory:
             dataset_type = DatasetType(dataset_type_prefix)
 
             # Return the appropriate processor
-            if dataset_type == DatasetType.TIME_SERIES:
+            if dataset_type == DatasetType.TOPIC_SUMMARY:
                 logger.info(f"Creating TSProcessor for dataset {dataset_id}")
                 return TSProcessor()
             elif dataset_type == DatasetType.REGULAR_MATRIX:

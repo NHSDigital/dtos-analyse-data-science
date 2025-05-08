@@ -5,7 +5,7 @@ from enum import Enum
 
 class DatasetType(str, Enum):
     """Enum representing the types of datasets supported by the ONS API"""
-    TIME_SERIES = "TS"
+    TOPIC_SUMMARY = "TS"
     REGULAR_MATRIX = "RM"
     OTHER = "OTHER"
 
@@ -44,7 +44,7 @@ class Dataset(BaseModel):
     def dataset_type(self) -> DatasetType:
         """Determine the dataset type based on the ID prefix"""
         if self.id.startswith("TS"):
-            return DatasetType.TIME_SERIES
+            return DatasetType.TOPIC_SUMMARY
         elif self.id.startswith("RM"):
             return DatasetType.REGULAR_MATRIX
         else:
