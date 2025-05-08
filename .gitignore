@@ -13,6 +13,7 @@
 *__pycache__*
 *.csv
 *.json
-
+*.DS_Store
+*.coverage
 # test
 # Please, add your custom content below!
