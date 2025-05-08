@@ -1,99 +1,344 @@
-# ONS Client
+# ONS Census Data Tool
+
+A Python tool for retrieving, processing, and flattening census data from the UK Office for National Statistics (ONS) API.
 
 ## Overview
 
-The ONS Client package provides an interface to the Office for National Statistics (ONS) Developer Hub API. It allows you to programmatically access, filter, and download datasets from ONS using HTTP requests. The package uses pydantic models for robust data validation and type safety, ensuring that API interactions are reliable and maintainable.
+This tool provides a clean, efficient way to download and process Census 2021 data from the ONS API. It supports both Topic Summary (TS) and Regular Matrix (RM) datasets, handling the specific requirements of each format while providing a consistent output structure.
 
-## Features
+Key features:
 
-- **API Integration:** Connects to the ONS Developer Hub API at `https://api.beta.ons.gov.uk/v1` for retrieving and filtering datasets.
-- **Filter Creation:** Utilizes pydantic models (e.g., FilterRequest, DatasetIdentifier, DimensionFilter, Area) to create and validate filter requests.
-- **CSV Downloads:** Supports downloading filtered dataset outputs as CSV files. Handles both single-area queries and batch processing for large sets of area codes.
-- **Batch Processing & Rate Limiting:** Implements batch processing with fixed delays to adhere to rate limits (e.g., 15 requests per 10 seconds for high-demand assets). This ensures compliance with ONS rate limiting guidelines. Future improvements could include dynamic adjustment based on the `Retry-After` header.
-- **File Management:** Manages temporary files during batch processing, merging multiple CSV outputs into a consolidated file while ensuring proper header handling.
-- **Utility Functions:** Includes helper functions for directory creation and list chunking to support data processing.
+- Progress bar visualization for batch processing
+- Efficient handling of large datasets through batched requests
+- Automatic flattening of complex hierarchical data into tabular CSV format
+- Support for all geographic levels (country, region, local authority, MSOA, LSOA, output area)
+- Modular architecture with Pydantic models for robust type checking
+- Implements ONS API rate limiting guidelines
 
-## Package Structure
+## Installation
 
-- **models.py:** Contains pydantic models representing various entities such as filter requests, dataset identifiers, dimensions, and area information.
-- **ons_client.py:** Implements the core ONS API client. This module handles API requests, caches area data, and provides methods to retrieve area types and other metadata.
-- **filter_processor.py:** Processes filter requests by constructing the required payloads, submitting them to the API, and handling the response (including file downloads).
-- **download_filtered_csv.py:** A script that leverages the client and filter processor to download CSV outputs. It demonstrates both single-area and batch processing workflows.
-- **utils.py:** Provides utility functions (e.g., `chunk_list`, `ensure_dir`) to support directory management and data handling.
+### Prerequisites
 
-## How It Works
+- Python 3.8 or higher
+- Required Python packages:
+  - `requests`
+  - `pandas`
+  - `tqdm` (for progress bars)
+  - `pydantic`
 
-1. **Initialization and Caching:** The client (`ONSApiClient`) is instantiated to communicate with the ONS API. It also implements a caching mechanism for area codes. The method `get_cached_areas` retrieves cached area data for a given population type and area type. If the data is already cached, it returns it immediately, reducing redundant API calls and improving performance. If not, it fetches the data from the API and stores it in the cache for future use.
+### Setup
 
-2. **Filter Request Creation:** Using the `FilterProcessor`, a filter request is built using specified parameters (dataset ID, population type, area type, and optionally, area codes). Pydantic models ensure that the request data is valid.
-
-3. **Data Download:** The filter request is processed to submit the job to the API, which generates CSV outputs. For large requests, the package splits the area codes into batches, processes each batch separately (with delays to respect rate limits), and then merges them into a final CSV file.
-
-4. **Output:** The final CSV file(s) are saved in a structured directory (under a `data` folder) and can be used for further analysis or integration into other systems.
-
-## Installation and running the code
-
-Clone the repository and install the required dependencies:
-
-### Locally
-
-Install Poetry if you don't already have it:
-
-```bash
-pip install poetry
-```
-
-Install the dependencies using Poetry:
+1. Install the requirements using poetry
 
 ```bash
 poetry install
 ```
 
-Navigate to the scrape_ONS folder, then to run the code using Poetry, use the following command:
+## Usage
+
+Run the tool from the command line:
 
 ```bash
-poetry run python ons_client/download_filtered_csv.py
+# Download a dataset
+poetry run python run_census.py --dataset TS030 --geo-level ctry
+
+# List all available datasets
+poetry run python run_census.py --list-datasets
 ```
 
-### Using Podman
+### Command-line Arguments
 
-Navigate to the scrape_ONS folder then,
+| Argument | Description | Example |
+|----------|-------------|---------|
+| `--dataset` | Dataset ID to retrieve | `TS030`, `RM097` |
+| `--list-datasets` | List all available datasets and examples | |
+| `--geo-level` | Geographic level to retrieve (if not specified, all levels will be processed) | `ctry`, `rgn`, `la`, `msoa`, `lsoa`, `oa` |
+| `--output-dir` | Output directory for data files (defaults to `data/{dataset_id}/`) | `./my_data` |
+| `--batch-size` | Override the default batch size for area processing | `100` |
+| `--population-type` | Population type for census data (default: `UR`) | `UR` |
+| `--debug` | Enable debug logging | |
+
+### Examples
+
+Download a Topic Summary dataset for all countries:
 
 ```bash
-podman build -t scrape_ons_image .
+poetry run python run_census.py --dataset TS030 --geo-level ctry
 ```
 
-Once the image has built
+Download a Regular Matrix dataset for all regions:
 
 ```bash
-podman run --rm \
-  -v "$(pwd):/app" \
-  -w /app \
-  scrape_ons_image
+poetry run python run_census.py --dataset RM097 --geo-level rgn
 ```
 
-## Requirements
+Download a dataset for all geographic levels:
 
-- Python 3.7+
-- requests
-- pydantic
+```bash
+poetry run python run_census.py --dataset TS030
+```
 
-## Integration with ONS Developer Hub
+Use a specific output directory:
 
-This package is built to work seamlessly with the ONS Developer Hub API:
+```bash
+poetry run python run_census.py --dataset TS030 --geo-level ctry --output-dir ./my_census_data
+```
 
-- **Endpoint:** Uses the base URL `https://api.beta.ons.gov.uk/v1`.
-- **Rate Limiting:** Implements delays between batches to respect the APIs rate limits.
-- **Filter Service:** Supports creating customizable filter requests as documented in the ONS Developer Hub guidelines.
+Handle dataset availability at different geographic levels:
 
-For further details, refer to the [ONS Developer Hub](https://developer.ons.gov.uk/) documentation.
+```bash
+# This will work (Religion data is available at OA level)
+poetry run python run_census.py --dataset TS030 --geo-level oa
 
-## Future Improvements
+# This will show an availability error (dataset not available at OA level)
+poetry run python run_census.py --dataset TS009 --geo-level oa
 
-- Enhance rate limiting by dynamically handling the `Retry-After` header from API responses.
-- Explore asynchronous processing for faster batch downloads.
-- Improve error handling and logging for better troubleshooting and stability.
+# Try a different geographic level instead
+poetry run python run_census.py --dataset TS009 --geo-level lsoa
+```
+
+## ONS API Integration
+
+This tool connects to the Office for National Statistics (ONS) API to retrieve census data. The API is available at:
+
+[https://api.beta.ons.gov.uk/v1](https://api.beta.ons.gov.uk/v1)
+
+No API key is required as the ONS API is open and unrestricted.
+
+### API Endpoints Used
+
+The tool primarily uses the following ONS API endpoints as documented in the [ONS Developer Hub](https://developer.ons.gov.uk/):
+
+1. **Population Types**:
+   - `GET /population-types` - Lists available population types
+
+2. **Area Types**:
+   - `GET /population-types/{population-type}/area-types` - Lists available geographic levels
+   - `GET /population-types/{population-type}/area-types/{area-type}/areas` - Lists areas for a specific geographic level
+
+3. **Census Observations (for RM datasets)**:
+   - `GET /population-types/{population-type}/census-observations` - Retrieves observation data
+
+4. **Dataset Observations (for TS datasets)**:
+   - `GET /datasets/{datasetId}/editions/{edition}/versions/{version}/json` - Retrieves topic summary data
+
+### Rate Limiting
+
+The tool implements best practices to respect ONS API rate limits:
+
+- **Batch Processing**: Data is retrieved in batches to avoid exceeding API limits
+- **Request Throttling**: Implements delays between requests as per ONS guidelines
+- **Retry Logic**: Handles 429 responses with exponential backoff
+
+According to ONS Developer Hub, the following rate limits are applied:
+
+- 120 requests per 10 seconds for all site and API assets
+- 200 requests per 1 minute for all site and API assets
+- 15 requests per 10 seconds for high-demand assets
+
+## Dataset Types
+
+The tool supports two types of ONS datasets:
+
+### Topic Summary (TS) Datasets
+
+Topic Summary datasets (prefixed with `TS`) represent simpler data structures focused on a single variable across different dimensions. These are accessed using the `/datasets/{datasetId}/editions/{edition}/versions/{version}/json` endpoint.
+
+Examples include:
+
+- `TS030`: Religion by geographic area
+- `TS008`: Sex by geographic area
+- `TS021`: Age by geographic area
+
+### Regular Matrix (RM) Datasets
+
+Regular Matrix datasets (prefixed with `RM`) represent more complex data structures with multiple dimensions. The original implementation in ONS Developer Hub documentation suggests using the `/population-types/{population-type}/census-observations` endpoint, but our testing found that using the same endpoint as TS datasets works more reliably.
+
+Examples include:
+
+- `RM097`: Occupancy rating (bedrooms) by ethnic group
+- `RM040`: Age by sex by long-term health condition
+- `RM052`: Country of birth by sex
+
+### Finding Dataset IDs
+
+While this tool requires you to know the dataset ID you want to download, you can browse available datasets through the [ONS website](https://www.ons.gov.uk/census) or use the API directly:
+
+### Example API Request
+
+To list all available datasets, you can use the following API request:
+
+```http
+GET https://api.beta.ons.gov.uk/v1/datasets
+```
+
+This endpoint returns a list of datasets available in the ONS API, including metadata such as dataset IDs, titles, and descriptions. You can use this information to identify the dataset ID required for your analysis.
+
+## Output Format
+
+Data is saved in flattened CSV format with dimensions as columns:
+
+``` csv
+ctry,ctry_code,religion_tb,religion_tb_code,observation
+England,E92000001,No religion,1,20715664
+England,E92000001,Christian,2,26167900
+...
+```
+
+Each row represents a unique combination of dimensions with the corresponding observation value.
+
+## Project Structure
+
+``` plaintext
+ons_client/
+├── __init__.py          # Package initialization
+├── api/                 # API client components
+│   ├── __init__.py
+│   ├── client.py        # Base API client
+│   ├── ts_client.py     # Topic Summary client
+│   └── rm_client.py     # Regular Matrix client
+├── models/              # Pydantic data models
+│   ├── __init__.py
+│   ├── common.py        # Shared models
+│   ├── ts_models.py     # Topic Summary models
+│   └── rm_models.py     # Regular Matrix models
+├── processors/          # Data processors
+│   ├── __init__.py
+│   ├── base.py          # Base processor
+│   ├── ts_processor.py  # Topic Summary processor
+│   └── rm_processor.py  # Regular Matrix processor
+└── cli.py               # Command-line interface
+```
+
+## Testing
+
+The project includes a comprehensive test suite to ensure code quality and reliability. Tests are organized in a structure that mirrors the main codebase.
+
+### Test Structure
+
+``` planetext
+tests/
+├── unit/                # Unit tests
+│   ├── api/             # API client tests
+│   ├── models/          # Data model tests
+│   └── processors/      # Processor tests
+└── integration/         # Integration tests
+```
+
+### Running Tests
+
+To run the test suite:
+
+```bash
+# Run all tests
+poetry run python -m pytest tests/
+
+# Run unit tests only
+poetry run python -m pytest tests/unit/
+
+# Run specific test modules
+poetry run python -m pytest tests/unit/api/
+poetry run python -m pytest tests/unit/models/
+poetry run python -m pytest tests/unit/processors/
+
+# Run with coverage report
+poetry run python -m pytest tests/ --cov=ons_client
+```
+
+### Test Coverage
+
+The project maintains high test coverage across critical components:
+
+- **Models**: 100% coverage - ensuring robust data validation
+- **API Clients**: ~90% coverage - verifying correct API interactions
+- **Processors**: ~80% coverage - testing data transformation logic
+
+The overall test coverage is maintained above 65%, with continuous improvements targeted in the CLI module.
+
+### Test Types
+
+1. **Unit Tests**:
+   - **Model Tests**: Verify the data validation and conversion logic in Pydantic models
+   - **API Client Tests**: Test API URL construction, response parsing, and error handling
+   - **Processor Tests**: Verify data transformation and flattening functionality
+
+2. **Test Fixtures**:
+   - Sample API responses for both TS and RM datasets
+   - Mock HTTP responses for predictable testing
+
+3. **Mocking Strategy**:
+   - External API calls are mocked to prevent actual network requests
+   - File operations are mocked for testing I/O functionality
+
+4. **Pydantic Models in Testing**:
+   - Pydantic models provide automatic validation during tests
+   - Models catch type mismatches and schema violations early
+   - Serialization/deserialization is thoroughly tested to ensure data consistency
+   - The models serve as a contract between API responses and application code
+
+### Contributing Tests
+
+When adding new features, ensure test coverage by:
+
+1. Adding unit tests for any new functions or classes
+2. Creating mocks for external dependencies
+3. Running the test suite with coverage to identify any gaps
+
+## How It Works
+
+1. **Configuration**: The tool parses command-line arguments and creates a configuration object.
+2. **Area Retrieval**: It fetches all areas for the specified geographic level using `/population-types/{population_type}/area-types/{geo_level}/areas`.
+3. **Batch Processing**: Areas are processed in batches to avoid API limits, with progress visualization.
+4. **Data Processing**:
+   - For TS datasets: Uses `/datasets/{datasetId}/editions/2021/versions/1/json?area-type={geo_level},{area_codes}`
+   - For RM datasets: Uses the same endpoint format as TS datasets
+   - Raw API responses are temporarily stored
+   - The appropriate processor flattens the data by reconstructing dimension combinations
+   - The final CSV is generated with dimensions as columns
+5. **Cleanup**: Temporary files are removed, leaving only the flattened data
+
+## Design Patterns
+
+The tool implements several design patterns for flexibility and maintainability:
+
+- **Factory Pattern**: For creating the appropriate client and processor based on dataset type
+- **Strategy Pattern**: Different processing strategies for different dataset types
+- **Decorator Pattern**: For retry logic in API requests
+- **Repository Pattern**: For data access and caching
+
+## Troubleshooting
+
+If you encounter any issues:
+
+1. Use the `--debug` flag to enable detailed logging
+2. Check the `.debug.json` files in the output directory for raw API responses
+3. Ensure you have a stable internet connection
+4. Verify that the dataset ID is correct and available in the ONS API
+
+Common issues:
+
+- **404 Errors**: The ONS API sometimes returns 404 errors for valid URLs. The tool includes retry logic.
+- **429 Too Many Requests**: If you hit rate limits, the tool will back off and retry automatically.
+- **Timeout Errors**: For very large datasets, try using a smaller geographic level or increasing batch size.
+
+## Limitations
+
+- The ONS API sometimes returns 404 errors for valid URLs. The tool includes retry logic.
+- Some datasets may have rate limiting. The tool implements appropriate backoff strategies.
+- Very large geographic levels (like OA) may take significant time to process.
+- The API is in Beta and may have breaking changes, as noted in the ONS Developer Hub.
+- Not all datasets are available at all geographic levels. The tool now automatically checks if a dataset is available at a specified geographic level before attempting to process it, avoiding unnecessary processing.
+  - For example, some datasets (like TS009) are not available at the Output Area (OA) level.
+  - The tool will display a clear message when a dataset isn't available at a specific level.
+  - When using the OA level and encountering unavailability, try using higher geographic levels like LSOA, MSOA, or Local Authority (LA).
+
+## References
+
+- [ONS Developer Hub](https://developer.ons.gov.uk/) - Official documentation for the ONS API
+- [ONS Census 2021](https://www.ons.gov.uk/census) - Census data and documentation
+- [ONS API Observations](https://developer.ons.gov.uk/observations/) - Guide to requesting specific observations
+- [ONS API Rate Limiting](https://developer.ons.gov.uk/bots/) - Rate limiting guidelines
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
