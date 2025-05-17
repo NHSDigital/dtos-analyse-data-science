@@ -94,7 +94,7 @@ function run-editorconfig-in-docker() {
   source ./scripts/docker/docker.lib.sh
 
   # shellcheck disable=SC2155
-  local image=$(name=mstruebing/editorconfig-checker docker-get-image-version-and-pull)
+  local image=$(name=docker.io/mstruebing/editorconfig-checker docker-get-image-version-and-pull)
   # We use /dev/null here as a backstop in case there are no files in the state
   # we choose. If the filter comes back empty, adding `/dev/null` onto it has
   # the effect of preventing `ec` from treating "no files" as "all the files".

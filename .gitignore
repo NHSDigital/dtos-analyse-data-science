@@ -17,3 +17,6 @@
 *.coverage
 # test
 # Please, add your custom content below!
+
+# Local environment variables
+.env
