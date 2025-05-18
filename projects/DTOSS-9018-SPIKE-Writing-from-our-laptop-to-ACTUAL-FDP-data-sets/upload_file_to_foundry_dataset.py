@@ -52,11 +52,12 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Upload a file to a Foundry dataset.")
     parser.add_argument("filepath_local", type=str, help="Path to the local file to upload.")
+    parser.add_argument("--filename_foundry", type=str, default=None, help="Foundry destination file path.")
     args = parser.parse_args()
 
     filepath_local: str = args.filepath_local
     filename_local: str = os.path.basename(filepath_local)
-
+    filename_foundry: str = args.filename_foundry or filename_local
 
     client = get_foundry_client(host, token)
     upload_file_to_foundry_dataset(client, dataset_rid, filepath_local, filename_foundry=filename_local)

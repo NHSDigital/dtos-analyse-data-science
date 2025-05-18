@@ -6,5 +6,17 @@ TODO - add detail
 
 ## Troubleshooting
 
-- Apply Schema button not working in Foundry
+- If the 'Apply Schema' button isn't working in Foundry.
   - Make sure the data uploaded is in bytes format.
+
+- If Foundry's Preview doesn't show enough rows.
+  - Open a Jupyter notebook and run:
+
+```
+from foundry.transforms import Dataset
+
+dataset = Dataset.get("my_dataset")
+files = dataset.files().download()
+filename = next(iter(files.values()))
+pd.read_json(filename, lines=True)
+```

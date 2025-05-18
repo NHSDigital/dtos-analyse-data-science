@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime
 import json
 import logging
 import os
@@ -19,7 +20,12 @@ def create_list_of_events(n_events: int = 1_000, n_kv_pairs_per_event: int = 100
 
     for i in range(n_events):
         payload = [{f"key_{j}": f"value_{j}"} for j in range(n_kv_pairs_per_event)]
-        events.append({"id": i, "name": "foo", "payload": payload})
+        events.append({
+            "id": i,
+            "name": "foo",
+            "timestamp": datetime.datetime.now().isoformat(),
+            "payload": payload
+            })
 
     logger.info(f"Created {n_events:,} events, each with {n_kv_pairs_per_event:,} key value pairs.")
 
