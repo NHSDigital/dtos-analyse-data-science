@@ -1,7 +1,9 @@
+import gc
 import json
 import logging
 import os
 from pathlib import Path
+import time
 from typing import List
 
 from dotenv import load_dotenv
@@ -44,7 +46,7 @@ def create_json_lines_file(filename: str, events: List[dict], path=Path('/tmp/')
 
     filesize_mb = os.path.getsize(filepath) / (1024 * 1024)
 
-    logger.info(f"Wrote JSON lines file: {filepath}, {filesize_mb:.2f} MB")
+    logger.info(f"Created local JSON lines file: {filepath}, {filesize_mb:.2f} MB")
 
     return str(filepath)
 
@@ -58,21 +60,33 @@ def get_foundry_client(host: str, token: str) -> FoundryClient:
 
 def upload_file_to_foundry_dataset(client: FoundryClient, dataset_rid: str, filepath_local: str, filename_foundry: str) -> None:
     with open(filepath_local, "rb") as f:
-        client.datasets.Dataset.File.upload(
-            dataset_rid=dataset_rid,
-            file_path=filename_foundry,
-            body=f.read()
-        )
-    logger.info(f"File {filepath_local} uploaded to foundry as {filename_foundry}.")
+        bytes_ = f.read()
+
+    start_time = time.time()
+
+    client.datasets.Dataset.File.upload(
+        dataset_rid=dataset_rid,
+        file_path=filename_foundry,
+        body=bytes_
+    )
+
+    end_time = time.time()
+
+    upload_time_seconds = end_time - start_time
+
+    logger.info(f"File {filepath_local} uploaded to foundry as {filename_foundry} in {upload_time_seconds:.0f} seconds")
 
 
 if __name__ == "__main__":
+
+    logger.info("Start")
+
     token: str = os.environ["BEARER_TOKEN"]
     host: str = os.environ["HOSTNAME"]
     dataset_rid: str = os.environ["DATASET_RID"]
 
-    n_events: int = 3
-    n_kv_pairs_per_event: int = 2
+    n_events: int = 100
+    n_kv_pairs_per_event: int = 100
 
     filename_description: str = 'dummy'
 
@@ -82,3 +96,7 @@ if __name__ == "__main__":
     filepath_local = create_json_lines_file(filename_local, events)
     client = get_foundry_client(host, token)
     upload_file_to_foundry_dataset(client, dataset_rid, filepath_local, filename_foundry=filename_local)
+
+    gc.collect()
+
+    logger.info("End")
