@@ -23,7 +23,7 @@ def create_list_of_events(n_events: int = 1_000, n_kv_pairs_per_event: int = 100
         events.append({
             "id": i,
             "name": "foo",
-            "timestamp": datetime.datetime.now().isoformat(),
+            "timestamp": datetime.now().isoformat(),
             "payload": payload
             })
 
