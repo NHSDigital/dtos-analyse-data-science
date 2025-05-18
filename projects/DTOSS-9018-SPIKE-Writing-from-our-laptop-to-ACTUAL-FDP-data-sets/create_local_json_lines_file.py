@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 import os
@@ -44,9 +45,15 @@ def create_json_lines_file(filename: str, events: List[dict], path=Path('/tmp/')
 
 
 if __name__ == "__main__":
-    n_events: int = 100
-    n_kv_pairs_per_event: int = 100
-    filename_description: str = 'dummy'
+    parser = argparse.ArgumentParser(description="Create a local JSON lines file.")
+    parser.add_argument("--n_events", type=int, default=100, help="Number of events to create")
+    parser.add_argument("--n_kv_pairs_per_event", type=int, default=100, help="Number of key-value pairs per event")
+    parser.add_argument("--filename_description", type=str, default="dummy", help="Description for the filename")
+    args = parser.parse_args()
+
+    n_events: int = args.n_events
+    n_kv_pairs_per_event: int = args.n_kv_pairs_per_event
+    filename_description: str = args.filename_description
 
     events = create_list_of_events(n_events, n_kv_pairs_per_event)
     filename_local = get_local_file_name(filename_description, n_events, n_kv_pairs_per_event)

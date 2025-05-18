@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 import time
@@ -27,6 +28,8 @@ def upload_file_to_foundry_dataset(client: FoundryClient, dataset_rid: str, file
     with open(filepath_local, "rb") as f:
         bytes_ = f.read()
 
+    logger.info("Starting upload...")
+
     start_time = time.time()
 
     client.datasets.Dataset.File.upload(
@@ -43,14 +46,17 @@ def upload_file_to_foundry_dataset(client: FoundryClient, dataset_rid: str, file
 
 
 if __name__ == "__main__":
-
-    logger.info("Start")
-
     token: str = os.environ["BEARER_TOKEN"]
     host: str = os.environ["HOSTNAME"]
     dataset_rid: str = os.environ["DATASET_RID"]
 
+    parser = argparse.ArgumentParser(description="Upload a file to a Foundry dataset.")
+    parser.add_argument("filepath_local", type=str, help="Path to the local file to upload.")
+    args = parser.parse_args()
+
+    filepath_local: str = args.filepath_local
+    filename_local: str = os.path.basename(filepath_local)
+
+
     client = get_foundry_client(host, token)
     upload_file_to_foundry_dataset(client, dataset_rid, filepath_local, filename_foundry=filename_local)
-
-    logger.info("End")
