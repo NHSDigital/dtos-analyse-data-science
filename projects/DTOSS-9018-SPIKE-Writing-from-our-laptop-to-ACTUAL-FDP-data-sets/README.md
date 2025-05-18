@@ -12,7 +12,7 @@ TODO - add detail
 - If Foundry's Preview doesn't show enough rows.
   - Open a Jupyter notebook and run:
 
-```
+```Python
 from foundry.transforms import Dataset
 
 dataset = Dataset.get("my_dataset")
