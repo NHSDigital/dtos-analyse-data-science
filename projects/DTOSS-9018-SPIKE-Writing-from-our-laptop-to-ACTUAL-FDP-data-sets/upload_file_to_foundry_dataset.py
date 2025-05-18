@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime
+import gc
 import logging
 import os
 import time
@@ -51,9 +52,10 @@ def upload_file_to_foundry_dataset(client: FoundryClient, dataset_rid: str, file
 
 
 if __name__ == "__main__":
-    token: str = os.environ["BEARER_TOKEN"]
-    host: str = os.environ["HOSTNAME"]
-    parent_folder_rid: str = os.environ["PARENT_FOLDER_RID"]
+    token: str = os.environ.get("BEARER_TOKEN")
+    host: str = os.environ.get("HOSTNAME")
+    parent_folder_rid: str = os.environ.get("PARENT_FOLDER_RID")
+    foundry_dataset_id: str = os.environ.get("DATASET_RID")
 
     parser = argparse.ArgumentParser(description="Upload a file to a Foundry dataset.")
     parser.add_argument("--filepath_local", type=str, default='/tmp/dummy.jsonl', help="Path to the local file to upload.")
@@ -68,5 +70,11 @@ if __name__ == "__main__":
     foundry_filename: str = args.foundry_filename or filename_local
 
     client = get_foundry_client(host, token)
-    result = client.datasets.Dataset.create(name=foundry_dataset_name, parent_folder_rid=parent_folder_rid)
-    upload_file_to_foundry_dataset(client, result.rid, filepath_local, foundry_filename=foundry_filename)
+
+    if foundry_dataset_id is None:
+        result = client.datasets.Dataset.create(name=foundry_dataset_name, parent_folder_rid=parent_folder_rid)
+        foundry_dataset_id = result.rid
+
+    upload_file_to_foundry_dataset(client, foundry_dataset_id, filepath_local, foundry_filename=foundry_filename)
+
+    gc.collect()

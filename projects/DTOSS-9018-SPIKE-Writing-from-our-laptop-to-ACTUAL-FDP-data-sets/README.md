@@ -30,9 +30,9 @@ FIXME - update with actual volumes from ticket.
 | Description | n events total | n events per file | n key value pairs per event | File size (MB) | Upload time (s) |
 | ----------- | -------: | -------: | --------------------------: | --------: | ----------: |
 | One file to one dataset   | 1,000 | 1,000 | 100 | 2 | 3 |
-| Two files to ***two separate*** datasets   | 2,000 | 1,000 | 100 | 2 | 3 |
-| Ten files to ***ten separate*** datasets   | 10,000 | 1,000 | 100 |  |  |
-| 10,000 files to ***10,000 separate*** datasets   | 10,000 | 1 | 100 |  |  |
+| Two files to ***two separate*** datasets, concurrently   | 2,000 | 1,000 | 100 | 2 | 3 |
+| Ten files to ***ten separate*** datasets, concurrently   | 10,000 | 1,000 | 100 |  |  |
+| 2,000 files to ***2,000 separate*** datasets, concurrently   | 2,000 | 1 | 100 |  |  |
 
 'Two files to ***the same*** dataset' is not in the table because it didn't work.
 We get [the error](https://www.palantir.com/docs/foundry/api/v2/general/overview/errors/?productId=foundry&slug=general&slug=overview&slug=errors): `OpenTransactionAlreadyExists`:
@@ -43,16 +43,45 @@ So we can't write multiple files to the same dataset at the same time.
 
 ### Commands
 
-```Python
+```bash
 # Set up
+cd projects/DTOSS-9018-SPIKE-Writing-from-our-laptop-to-ACTUAL-FDP-data-sets
 python create_local_json_lines_file.py --n_events 1000 --n_kv_pairs_per_event 100
 
 # One file to one dataset
-python upload_file_to_foundry_dataset.py /tmp/dummy--1000-events-by-100-kv-pairs.jsonl
+python upload_file_to_foundry_dataset.py --filepath_local /tmp/dummy--1000-events-by-100-kv-pairs.jsonl
 
 # Two files to ***the same*** dataset - THIS FAILED - see note above
-python upload_file_to_foundry_dataset.py /tmp/dummy--1000-events-by-100-kv-pairs.jsonl &
-python upload_file_to_foundry_dataset.py /tmp/dummy--1000-events-by-100-kv-pairs.jsonl &
+# NOTE that DATASET_RID must be set in .env for this to work
+python upload_file_to_foundry_dataset.py --filepath_local /tmp/dummy--1000-events-by-100-kv-pairs.jsonl &
+python upload_file_to_foundry_dataset.py --filepath_local /tmp/dummy--1000-events-by-100-kv-pairs.jsonl &
+
+# Ten files to ***ten separate*** datasets, concurrently
+TEST_RESULT_FOLDER=/tmp/test_results_ten_files
+rm -rf $TEST_RESULT_FOLDER
+mkdir $TEST_RESULT_FOLDER
+for i in {1..10}; do
+  printf -v num "%02d" "$i"
+  python upload_file_to_foundry_dataset.py --filepath_local /tmp/dummy--1000-events-by-100-kv-pairs.jsonl > $TEST_RESULT_FOLDER/upload_log_${num}.log 2>&1 &
+done
+wait
+
+# Sense check the earliest and latest timestamps
+cat $TEST_RESULT_FOLDER/upload_log_* | sort | head -n 1 | awk -F' - ' '{print "Earliest timestamp: "$1}'
+cat $TEST_RESULT_FOLDER/upload_log_* | sort | tail -n 1 | awk -F' - ' '{print "Latest timestamp: "$1}'
+
+# 2,000 files to ***2,000 separate*** datasets, concurrently
+TEST_RESULT_FOLDER=/tmp/test_results_2000_files
+rm -rf $TEST_RESULT_FOLDER
+mkdir $TEST_RESULT_FOLDER
+for i in {1..2000}; do
+  printf -v num "%04d" "$i"
+  python upload_file_to_foundry_dataset.py --filepath_local /tmp/dummy--1-events-by-100-kv-pairs.jsonl > $TEST_RESULT_FOLDER/upload_log_${num}.log 2>&1 &
+done
+
+# Sense check the earliest and latest timestamps
+cat $TEST_RESULT_FOLDER/upload_log_* | sort | head -n 1 | awk -F' - ' '{print "Earliest timestamp: "$1}'
+cat $TEST_RESULT_FOLDER/upload_log_* | sort | tail -n 1 | awk -F' - ' '{print "Latest timestamp: "$1}'
 
 ```
 
