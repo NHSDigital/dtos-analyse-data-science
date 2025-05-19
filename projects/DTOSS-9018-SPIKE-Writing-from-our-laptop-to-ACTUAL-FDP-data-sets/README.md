@@ -1,5 +1,25 @@
 # SPIKE - Writing from our laptop to ACTUAL FDP data sets
 
+## TLDR
+
+1. Uploading batches of realistic-looking events to Foundry was reasonably quick: 200k events (or 450MB) per minute.
+2. The upload speed of the network was _probably_ the bottleneck.
+3. Lots of files, each with one event is bad because you have upload overhead per file and datasets that are [sub-optimal for analysis](https://www.palantir.com/docs/foundry/contour/performance-optimize#partitioning) in Foundry.
+
+## Overview
+
+Here, we test how long it takes to upload data to Foundry from a laptop.
+We construct arbitrary, but realistic-looking datasets of 100,000 events (or messages) using [create_local_json_lines_file.py](./create_local_json_lines_file.py).
+We then upload to Foundry using [upload_file_to_foundry_dataset.py](./upload_file_to_foundry_dataset.py).
+We send either one dataset at a time or many datasets concurrently (up to the RAM and CPU resources of the laptop).
+It takes around 30 seconds to upload 235MB whether we use one, two, or ten concurrent processes.
+My internet upload speed is ~60Mb/s or 7.5MB/s; and 235/7.5 = 31s.
+So, the bottleneck is probably my internet upload speed.
+
+We wanted to test small file uploads too, by sending 100,000 files, each with one event.
+This was too slow and resource intensive, so we test using only 1,000 files instead, which still takes 70s
+from the first process starting to the last one finishing.
+
 The ticket ([DTOSS-9018](https://nhsd-jira.digital.nhs.uk/browse/DTOSS-9018)) has more context and notes.
 
 ## Straw-man workflow
@@ -22,8 +42,6 @@ We note that:
    1. See Palantir optimisation advice [here](https://www.palantir.com/docs/foundry/contour/performance-optimize#partitioning).
 
 ## Timings
-
-FIXME - update with actual volumes from ticket.
 
 ### Results
 
