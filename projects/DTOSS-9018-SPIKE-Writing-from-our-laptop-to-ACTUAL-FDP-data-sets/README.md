@@ -5,6 +5,7 @@
 1. Uploading batches of realistic-looking events to Foundry was reasonably quick: 200k events (or 450MB) per minute.
 2. The upload speed of the network was _probably_ the bottleneck.
 3. Lots of files, each with one event is bad because you have upload overhead per file and datasets that are [sub-optimal for analysis](https://www.palantir.com/docs/foundry/contour/performance-optimize#partitioning) in Foundry.
+4. Concurrent uploads can't write to the same dataset; each must write to its own dataset object.
 
 ## Overview
 
@@ -12,6 +13,7 @@ Here, we test how long it takes to upload data to Foundry from a laptop.
 We construct arbitrary, but realistic-looking datasets of 100,000 events (or messages) using [create_local_json_lines_file.py](./create_local_json_lines_file.py).
 We then upload to Foundry using [upload_file_to_foundry_dataset.py](./upload_file_to_foundry_dataset.py).
 We send either one dataset at a time or many datasets concurrently (up to the RAM and CPU resources of the laptop).
+Each file is written to _it's own Foundry dataset object_ because a dataset (strictly a dataset branch) can only have one live transaction at a time.
 It takes around 30 seconds to upload 235MB whether we use one, two, or ten concurrent processes.
 My internet upload speed is ~60Mb/s or 7.5MB/s; and 235/7.5 = 31s.
 So, the bottleneck is probably my internet upload speed.
