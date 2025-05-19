@@ -39,7 +39,7 @@ This process should cover BAU (low volume) and back-filling (large volume) use c
 
 We note that:
 
-1. If the Function App has scaled by n, horizontally then there will be n Functions writing to n Foundry datasets ***at the same time***, each with a unique timestamp-UUID combination.
+1. If the Function App has scaled by n, horizontally then there will be n Functions writing to n Foundry datasets **_at the same time_**, each with a unique timestamp-UUID combination.
 2. We might need to do downstream processing to union or split raw data as necessary to get optimal file sizes for hadoop.
    1. See Palantir optimisation advice [here](https://www.palantir.com/docs/foundry/contour/performance-optimize#partitioning).
 
@@ -50,11 +50,11 @@ We note that:
 | Description | n events total | n events per file | n key value pairs per event | File size (MB) | Upload time (s) |
 | ----------- | -------: | -------: | --------------------------: | --------: | ----------: |
 | One file to one dataset   | 100,000 | 100,000 | 100 | 235 | 35 |
-| Two files to ***two separate*** datasets, concurrently   | 100,000 | 50,000 | 100 | 118 | 33 |
-| Ten files to ***ten separate*** datasets, concurrently   | 100,000 | 10,000 | 100 | 24 | 30 |
-| 1,000 files to ***1,000 separate*** datasets, concurrently   | 1,000 | 1 | 100 | ~0 | 70 |
+| Two files to **_two separate_** datasets, concurrently   | 100,000 | 50,000 | 100 | 118 | 33 |
+| Ten files to **_ten separate_** datasets, concurrently   | 100,000 | 10,000 | 100 | 24 | 30 |
+| 1,000 files to **_1,000 separate_** datasets, concurrently   | 1,000 | 1 | 100 | ~0 | 70 |
 
-'Two files to ***the same*** dataset' is not in the table because it didn't work.
+'Two files to **_the same_** dataset' is not in the table because it didn't work.
 We get [the error](https://www.palantir.com/docs/foundry/api/v2/general/overview/errors/?productId=foundry&slug=general&slug=overview&slug=errors): `OpenTransactionAlreadyExists`:
 
 > A transaction is already open on this dataset and branch. A branch of a dataset can only have one open transaction at a time.
@@ -71,16 +71,16 @@ python create_local_json_lines_file.py --n_events 1000 --n_kv_pairs_per_event 10
 # One file to one dataset
 python upload_file_to_foundry_dataset.py --filepath_local /tmp/dummy--100000-events-by-100-kv-pairs.jsonl
 
-# Two files to ***the same*** dataset, concurrently - THIS FAILED - see note above
+# Two files to **_the same_** dataset, concurrently - THIS FAILED - see note above
 # NOTE that DATASET_RID must be set in .env for this to work
 python upload_file_to_foundry_dataset.py --filepath_local /tmp/dummy--50000-events-by-100-kv-pairs.jsonl &
 python upload_file_to_foundry_dataset.py --filepath_local /tmp/dummy--50000-events-by-100-kv-pairs.jsonl &
 
-# Two files to ***two separate*** datasets, concurrently
+# Two files to **_two separate_** datasets, concurrently
 python upload_file_to_foundry_dataset.py --filepath_local /tmp/dummy--50000-events-by-100-kv-pairs.jsonl &
 python upload_file_to_foundry_dataset.py --filepath_local /tmp/dummy--50000-events-by-100-kv-pairs.jsonl &
 
-# Ten files to ***ten separate*** datasets, concurrently
+# Ten files to **_ten separate_** datasets, concurrently
 TEST_RESULT_FOLDER=/tmp/test_results_ten_files
 rm -rf $TEST_RESULT_FOLDER
 mkdir $TEST_RESULT_FOLDER
@@ -95,7 +95,7 @@ grep 'uploaded to foundry' ${TEST_RESULT_FOLDER}/* | wc -l | awk '{print "N succ
 cat $TEST_RESULT_FOLDER/upload_log_* | grep ^2025 | sort | head -n 1 | awk -F' - ' '{print "Earliest timestamp: "$1}'
 cat $TEST_RESULT_FOLDER/upload_log_* | grep ^2025 | sort | tail -n 1 | awk -F' - ' '{print "Latest timestamp: "$1}'
 
-# 1,000 files to ***1,000 separate*** datasets, concurrently
+# 1,000 files to **_1,000 separate_** datasets, concurrently
 TEST_RESULT_FOLDER=/tmp/test_results_1000_files
 rm -rf $TEST_RESULT_FOLDER
 mkdir $TEST_RESULT_FOLDER
