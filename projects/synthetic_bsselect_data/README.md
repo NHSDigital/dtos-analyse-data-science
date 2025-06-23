@@ -55,7 +55,10 @@ Run the data generation notebook:
 
 ### Calculate Metrics
 
-Open the metric_test notebook and run the analysis required:
+Open the metric_test notebook and run the analysis required (loading the relevant generated dataset from output_data). Metrics are calculated in 2 stages:
+
+1. Enrich tables: enrich_tables.py takes the joined episodes and subject data and adds helper columns used to calculate metrics. This enables simpler and faster calculation at when interacting with the dashboard.
+2. Calculate metrics: calculate_metrics.py allows metrics (currently uptake and round length) to be calculated over the dataset once the enrich_tables code has been run. These metrics can be calculated over specified date ranges and aggregations (eg BSO, GP).
 
 ## Project Structure
 
