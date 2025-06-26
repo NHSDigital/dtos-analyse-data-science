@@ -9,7 +9,7 @@ packages = [{ include = "ons_client" }]
 
 [tool.poetry.dependencies]
 python = "^3.12"
-requests = "^2.32.3"
+requests = "^2.32.4"
 pydantic = "^2.11.2"
 tqdm = "^4.67.1"
 pandas = "^2.2.3"
