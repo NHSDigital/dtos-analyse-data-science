@@ -18,5 +18,5 @@
 # test
 # Please, add your custom content below!
 
-# Environment variable file
+# Local environment variables
 .env
