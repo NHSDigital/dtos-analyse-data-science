@@ -24,7 +24,7 @@ def _perturb_value(value, apply_random_number_below_threshold=10, above_threshol
         upper_bound = int(value + deviation)
     else:
         lower_bound, upper_bound = 0, apply_random_number_below_threshold
-    return random.randint(lower_bound, upper_bound)
+    return random.SystemRandom().randint(lower_bound, upper_bound)
 
 
 def perturb_numeric_values_where_possible(value, apply_random_number_below_threshold=10, above_threshold_smear_factor=0.5):
