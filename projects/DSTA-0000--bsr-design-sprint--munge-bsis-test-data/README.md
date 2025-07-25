@@ -14,7 +14,7 @@ Ad hoc code to munge BSIS Test Files data as part of Breast Screen Reporting Tea
     cd dtos-analyse-data-science/projects/DSTA-0000--bsr-design-sprint--munge-bsis-test-data
     python -m venv .venv
     source .venv/bin/activate
-    pip install -f requirements.txt
+    pip install -r requirements.txt
     ```
 
 3. Open notebook in VScode.
