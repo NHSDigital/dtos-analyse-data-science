@@ -17,4 +17,11 @@ Ad hoc code to munge BSIS Test Files data as part of Breast Screen Reporting Tea
     pip install -r requirements.txt
     ```
 
-3. Open notebook in VScode.
+3. Add output folders:
+
+    ```shell
+    mkdir -p notebooks/data/inputs
+    mkdir notebooks/data/outputs
+    ```
+
+4. Open notebook in VScode.

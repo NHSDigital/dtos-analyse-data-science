@@ -50,18 +50,16 @@ def perturb_numeric_values_where_possible(value, apply_random_number_below_thres
     return value
 
 
-def xcheck__perturbation_worked_as_expected(df, df_other):
+def xcheck__perturbation_worked_as_expected(df_new, df_old):
     """
     Compare dataframes before and after perturbation.
 
     Only numeric values are checked.
     """
 
-    mask__numeric = df.map(lambda x: isinstance(x, (int, float)) and not isinstance(x, bool))
-    assert (
-        mask__numeric.sum().sum() == df.map(type).stack().value_counts().drop(str, axis=0).sum()
-    ), "Expect mask and cross check of numeric value counts to match"
+    first_numeric_row = 2
+    first_numeric_col = 5
 
-    diff = df[mask__numeric].astype(float) - df_other[mask__numeric].astype(float)
+    diff = df_new.iloc[first_numeric_row:, first_numeric_col:].astype(float) - df_old.iloc[first_numeric_row:, first_numeric_col:].astype(float)
     # display(diff.describe().round(0))
-    display(diff.abs().describe().round(0))
+    display(diff.abs().describe(include='all').round(0))
