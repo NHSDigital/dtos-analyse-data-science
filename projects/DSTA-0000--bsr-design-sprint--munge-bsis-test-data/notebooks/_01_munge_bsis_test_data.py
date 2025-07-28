@@ -2,6 +2,7 @@
 Helper functions for the notebook of the same name
 """
 
+import csv
 import logging
 import random
 
@@ -63,3 +64,11 @@ def xcheck__perturbation_worked_as_expected(df_new, df_old):
     diff = df_new.iloc[first_numeric_row:, first_numeric_col:].astype(float) - df_old.iloc[first_numeric_row:, first_numeric_col:].astype(float)
     # display(diff.describe().round(0))
     display(diff.abs().describe(include='all').round(0))
+
+
+def exporter(df, folder, filename):
+    """Tweaks to make the output files consistent with the formatting of input files."""
+    df = df.fillna("")
+    df[df.columns[1:]] = df[df.columns[1:]].astype(str)
+    df[df.columns[0]] = df[df.columns[0]].astype(int)
+    df.to_csv(folder / filename, index=False, quoting=csv.QUOTE_NONNUMERIC)
